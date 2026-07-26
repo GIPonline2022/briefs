@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Статус задач</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good:           #0ca30c;
+    --critical:       #d03b3b;
+    --s-not-started:  #2a78d6;
+    --s-in-progress:  #eb6834;
+    --s-done:         #1baf7a;
+    --s-blocked:      #eda100;
+    --s-cancelled:    #e87ba4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good:           #0ca30c;
+      --critical:       #e66767;
+      --s-not-started:  #3987e5;
+      --s-in-progress:  #d95926;
+      --s-done:         #199e70;
+      --s-blocked:      #c98500;
+      --s-cancelled:    #d55181;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good:           #0ca30c;
+    --critical:       #e66767;
+    --s-not-started:  #3987e5;
+    --s-in-progress:  #d95926;
+    --s-done:         #199e70;
+    --s-blocked:      #c98500;
+    --s-cancelled:    #d55181;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  header p {
+    margin: 0 0 28px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  /* KPI row */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 2px;
+    background: var(--gridline);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    padding: 14px 16px;
+  }
+  .kpi .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .kpi .value {
+    font-size: 28px;
+    font-weight: 600;
+    font-variant-numeric: proportional-nums;
+  }
+  .kpi.good .value { color: var(--good); }
+  .kpi.critical .value { color: var(--critical); }
+
+  /* Bar chart */
+  .chart {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px 14px;
+    margin-bottom: 28px;
+  }
+  .chart h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 44px;
+    align-items: center;
+    gap: 10px;
+    height: 32px;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .bar-row:hover { background: var(--page-plane); }
+  .bar-row .name {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .bar-track {
+    background: var(--gridline);
+    border-radius: 4px;
+    height: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px 0 0 4px;
+    min-width: 3px;
+  }
+  .bar-row .count {
+    font-size: 13px;
+    color: var(--text-primary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .legend {
+    display: none;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .controls span.lbl {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .seg button {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .seg button.active {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  /* Groups & table */
+  .group {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .group-header:hover { background: var(--page-plane); }
+  .group-header .dot {
+    width: 10px; height: 10px; border-radius: 50%; flex: none;
+  }
+  .group-header .title {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .group-header .n {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .group-header .chev {
+    color: var(--text-muted);
+    transition: transform .15s ease;
+    font-size: 11px;
+  }
+  .group.collapsed .chev { transform: rotate(-90deg); }
+  .group.collapsed .rows { display: none; }
+
+  .task-row {
+    border-top: 1px solid var(--gridline);
+    padding: 10px 16px 10px 36px;
+    cursor: pointer;
+  }
+  .task-row:hover { background: var(--page-plane); }
+  .task-row .line1 {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .task-row .id {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+  .task-row .title2 {
+    font-size: 13px;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .task-row .owner {
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex: none;
+  }
+  .task-row .detail {
+    display: none;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--gridline);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .task-row.open .detail { display: block; }
+  .task-row .detail b { color: var(--text-primary); font-weight: 600; }
+
+  footer {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body data-palette="#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4">
+<div class="viz-root wrap">
+  <header>
+    <h1>GIP.online — статус задач</h1>
+    <p id="updated"></p>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="chart">
+    <h2>Задачи по статусу</h2>
+    <div id="barChart"></div>
+  </div>
+
+  <div class="controls">
+    <span class="lbl">Группировать по:</span>
+    <div class="seg" id="groupSeg">
+      <button data-group="status" class="active">Статусу</button>
+      <button data-group="owner">Ответственному</button>
+      <button data-group="none">Без группировки</button>
+    </div>
+  </div>
+
+  <div id="groups"></div>
+
+  <footer>Данные из <code>docs/org-tasks/registry.csv</code> репозитория GIPonline · обновляется вручную, не в реальном времени</footer>
+</div>
+
+<script>
+const STATUS_META = {
+  not_started: { label: "Не начато",     color: "var(--s-not-started)" },
+  in_progress: { label: "В работе",      color: "var(--s-in-progress)" },
+  done:        { label: "Готово",        color: "var(--s-done)" },
+  blocked:     { label: "Заблокировано", color: "var(--s-blocked)" },
+  cancelled:   { label: "Отменено",      color: "var(--s-cancelled)" },
+};
+const STATUS_ORDER = ["not_started", "in_progress", "done", "blocked", "cancelled"];
+
+// Данные — снимок docs/org-tasks/registry.csv на 2026-07-26
+const TASKS = [
+{id:"ORG-038",title:"Перенести HTML-дашборды/отчёты с временного хостинга (GitHub Pages, публичный) на собственный хостинг проекта",source:"chat:2026-07-26",source_date:"2026-07-26",owner:"Александр (PO)",planned_date:"",status:"not_started",status_date:"2026-07-26",notes:"Цель — приватность: сейчас репозиторий briefs публичный, доступен кому угодно по ссылке; свой хостинг закроет доступ так, чтобы дашборды видели только мы."},
+{id:"ORG-037",title:"Зарегистрировать аккаунт Notion (бесплатный тариф) для документации и задач",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (PO)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Из решения 5.2 протокола встречи."},
+{id:"ORG-029",title:"Развернуть инфраструктуру («чёрный ящик») по согласованному скоупу (~22 часа при темпе 3 ч/день)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (разработчик)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"~1 неделя от начала работ (точная дата не зафиксирована)"},
+{id:"ORG-030",title:"Прислать финальную версию документа с зафиксированным выбором backend-фреймворка (Python/FastAPI)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (разработчик)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
+{id:"ORG-031",title:"Утвердить домен(ы) как собственник проекта перед регистрацией",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Игорь",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
+{id:"ORG-032",title:"Завести отдельную «сквозную» почту для регистрации всех сервисов проекта и передать доступ Александру (PO)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Игорь",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Возможно, тот же пункт, что и ORG-001 — сверить."},
+{id:"ORG-033",title:"Передать логотип (векторный формат) Александру (PO) и разработчикам",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Игорь",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Логотип уже готов по словам Игоря (п.9.1)"},
+{id:"ORG-034",title:"Приобрести 3 лицензии AI-инструмента (по 30$ за лицензию)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (PO)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
+{id:"ORG-035",title:"Создать Telegram-группу проекта",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (PO)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
+{id:"ORG-036",title:"Подготовить документ по безопасности (защита сервера, секреты)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Александр (PO) + Александр (разработчик)",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"По готовности окружения (условие, не дата)"},
+{id:"ORG-001",title:"Завести отдельную почту для регистрации сервисов проекта, дать доступ Product owner",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственники бизнеса",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"Возможно, тот же пункт, что и ORG-032 — сверить"},
+{id:"ORG-002",title:"Купить подписку Claude (платный тариф)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-003",title:"Выбрать язык/фреймворк backend",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner + Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"На встрече 2026-07-21 прозвучало решение (Python/FastAPI, п.10.1) — уточнить, считать ли задачу закрытой до прихода финального документа (см. ORG-030)"},
+{id:"ORG-004",title:"Создать приватный репозиторий на GitHub и базовую структуру папок согласно gip-architecture.md",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"done",status_date:"2026-07-26",notes:"Выполнено через Claude Code + GitHub MCP"},
+{id:"ORG-005",title:"Настроить защиту ветки main на GitHub (branch protection): запретить прямой push, обязательный Pull Request перед мержем",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"blocked",status_date:"2026-07-26",notes:"GitHub не даёт включить branch protection на приватном репо бесплатного личного аккаунта — нужен GitHub Pro (~$4/мес) или перевод в Team-организацию."},
+{id:"ORG-006",title:"Подключить Claude Code к репозиторию (установка, авторизация GitHub, клонирование)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"GitHub MCP уже подключён для администрирования репо, но это не то же самое, что полноценный Claude Code для разработки на сервере/у разработчика"},
+{id:"ORG-007",title:"Подключить собственника к репозиторию с правами только на чтение, а также подключить его Claude к репозиторию",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"Ждём GitHub-логин Игоря"},
+{id:"ORG-008",title:"Зарегистрироваться у хостинг-провайдера (Hetzner Cloud; план Б — DigitalOcean/Vultr)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-009",title:"Арендовать VPS (конфигурация CX22 или аналог, образ — Ubuntu Server 24.04 LTS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-010",title:"Настроить SSH-доступ к серверу (для Product owner и Разработчика)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-011",title:"Настроить базовый файрвол на сервере (ufw): разрешить только SSH/HTTP/HTTPS",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-012",title:"Установить Docker + Docker Compose",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-013",title:"Установить Node.js на сервере (для Claude Code CLI в SSH-сессии)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-014",title:"Утвердить домен у собственников (giptrans.cc / giptrans.co)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственники бизнеса",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"См. также ORG-031"},
+{id:"ORG-015",title:"Зарегистрировать утверждённый домен",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-016",title:"Подключить домен к Cloudflare (DNS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-017",title:"Настроить Nginx + Let's Encrypt (TLS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-018",title:"Проверить автопродление TLS-сертификата и добавить в UptimeRobot проверку срока SSL",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-019",title:"Зарегистрировать OAuth-приложение в Google Cloud Console (Client ID/Secret, redirect URI, allow-list email)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-020",title:"Развернуть PostgreSQL в контейнере — прод-окружение",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-021",title:"Развернуть PostgreSQL в контейнере — дев/тест-окружение",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-022",title:"Прописать лимиты CPU/RAM для дев-стека в docker-compose.yml",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-023",title:"Настроить GitHub Actions self-hosted runner для автодеплоя, тегирование образов",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-024",title:"Настроить обязательный снэпшот БД перед миграциями в прод-окружении",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-025",title:"Задеплоить минимальное тестовое приложение в оба окружения",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-026",title:"Настроить UptimeRobot",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-027",title:"Оформить отдельный документ по эксплуатационной безопасности",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Product owner + Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"См. также ORG-036 (пересекается по смыслу)"},
+{id:"ORG-028",title:"Актуализировать README.md: пошаговая инструкция развёртывания окружения",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик + Product owner",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+];
+
+document.getElementById("updated").textContent = "Снимок реестра орг-задач на 2026-07-26 · " + TASKS.length + " задач";
+
+// ---- KPI row ----
+const counts = {};
+STATUS_ORDER.forEach(s => counts[s] = 0);
+TASKS.forEach(t => counts[t.status] = (counts[t.status]||0) + 1);
+
+const kpiDefs = [
+  { label: "Всего задач", value: TASKS.length, cls: "" },
+  { label: "Готово", value: counts.done, cls: "good" },
+  { label: "В работе", value: counts.in_progress, cls: "" },
+  { label: "Заблокировано", value: counts.blocked, cls: "critical" },
+  { label: "Не начато", value: counts.not_started, cls: "" },
+];
+document.getElementById("kpis").innerHTML = kpiDefs.map(k =>
+  `<div class="kpi ${k.cls}"><div class="label">${k.label}</div><div class="value">${k.value}</div></div>`
+).join("");
+
+// ---- Bar chart (status breakdown, categorical, clickable -> filters groups) ----
+const maxCount = Math.max(...STATUS_ORDER.map(s => counts[s]), 1);
+const barChartEl = document.getElementById("barChart");
+barChartEl.innerHTML = STATUS_ORDER.map(s => {
+  const meta = STATUS_META[s];
+  const pct = Math.round((counts[s] / maxCount) * 100);
+  return `<div class="bar-row" data-status="${s}">
+    <div class="name">${meta.label}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${meta.color}"></div></div>
+    <div class="count">${counts[s]}</div>
+  </div>`;
+}).join("");
+
+// ---- Grouping + rows ----
+let currentGroup = "status";
+let activeFilter = null; // status key when filtered from chart click
+
+function renderGroups() {
+  const groupsEl = document.getElementById("groups");
+  let filtered = activeFilter ? TASKS.filter(t => t.status === activeFilter) : TASKS;
+
+  let buckets = [];
+  if (currentGroup === "status") {
+    buckets = STATUS_ORDER
+      .map(s => ({ key: s, label: STATUS_META[s].label, color: STATUS_META[s].color, items: filtered.filter(t => t.status === s) }))
+      .filter(b => b.items.length);
+  } else if (currentGroup === "owner") {
+    const owners = [...new Set(filtered.map(t => t.owner))].sort();
+    buckets = owners.map(o => ({ key: o, label: o, color: "var(--text-muted)", items: filtered.filter(t => t.owner === o) }));
+  } else {
+    buckets = [{ key: "all", label: "Все задачи", color: "var(--text-muted)", items: filtered }];
+  }
+
+  groupsEl.innerHTML = buckets.map(b => `
+    <div class="group" data-key="${b.key}">
+      <div class="group-header">
+        <span class="dot" style="background:${b.color}"></span>
+        <span class="title">${b.label}</span>
+        <span class="n">${b.items.length}</span>
+        <span class="chev">&#9660;</span>
+      </div>
+      <div class="rows">
+        ${b.items.map(t => `
+          <div class="task-row" data-id="${t.id}">
+            <div class="line1">
+              <span class="id">${t.id}</span>
+              <span class="title2">${t.title}</span>
+              <span class="owner">${t.owner}</span>
+            </div>
+            <div class="detail">
+              <b>Источник:</b> ${t.source} (${t.source_date})<br>
+              <b>Статус с:</b> ${t.status_date}${t.planned_date ? `<br><b>Плановый срок:</b> ${t.planned_date}` : ""}
+              ${t.notes ? `<br><b>Заметки:</b> ${t.notes}` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  groupsEl.querySelectorAll(".group-header").forEach(h => {
+    h.addEventListener("click", () => h.closest(".group").classList.toggle("collapsed"));
+  });
+  groupsEl.querySelectorAll(".task-row").forEach(r => {
+    r.addEventListener("click", (e) => { r.classList.toggle("open"); });
+  });
+}
+
+document.getElementById("groupSeg").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#groupSeg button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentGroup = btn.dataset.group;
+  renderGroups();
+});
+
+barChartEl.addEventListener("click", (e) => {
+  const row = e.target.closest(".bar-row");
+  if (!row) return;
+  const status = row.dataset.status;
+  activeFilter = (activeFilter === status) ? null : status;
+  document.querySelector('#groupSeg button[data-group="status"]').click();
+});
+
+renderGroups();
+</script>
+</body>
+</html>
