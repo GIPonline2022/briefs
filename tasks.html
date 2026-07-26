@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
 <title>Статус задач</title>
 <style>
+  html { color-scheme: light only; }
   .viz-root {
     color-scheme: light;
     --surface-1:      #fcfcfb;
@@ -23,44 +25,7 @@
     --s-blocked:      #eda100;
     --s-cancelled:    #e87ba4;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) .viz-root {
-      color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --page-plane:     #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
-      --good:           #0ca30c;
-      --critical:       #e66767;
-      --s-not-started:  #3987e5;
-      --s-in-progress:  #d95926;
-      --s-done:         #199e70;
-      --s-blocked:      #c98500;
-      --s-cancelled:    #d55181;
-    }
-  }
-  :root[data-theme="dark"] .viz-root {
-    color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --page-plane:     #0d0d0d;
-    --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --gridline:       #2c2c2a;
-    --baseline:       #383835;
-    --border:         rgba(255,255,255,0.10);
-    --good:           #0ca30c;
-    --critical:       #e66767;
-    --s-not-started:  #3987e5;
-    --s-in-progress:  #d95926;
-    --s-done:         #199e70;
-    --s-blocked:      #c98500;
-    --s-cancelled:    #d55181;
-  }
+  /* Тема зафиксирована на светлой — не зависит от системной темы устройства */
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -262,6 +227,24 @@
     color: var(--text-secondary);
     flex: none;
   }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 2px 9px 2px 7px;
+    border-radius: 999px;
+    background: var(--page-plane);
+    border: 1px solid var(--border);
+    flex: none;
+    white-space: nowrap;
+  }
+  .status-badge .ic {
+    font-weight: 700;
+    line-height: 1;
+  }
   .task-row .detail {
     display: none;
     margin-top: 8px;
@@ -311,28 +294,32 @@
 
 <script>
 const STATUS_META = {
-  not_started: { label: "Не начато",     color: "var(--s-not-started)" },
-  in_progress: { label: "В работе",      color: "var(--s-in-progress)" },
-  done:        { label: "Готово",        color: "var(--s-done)" },
-  blocked:     { label: "Заблокировано", color: "var(--s-blocked)" },
-  cancelled:   { label: "Отменено",      color: "var(--s-cancelled)" },
+  not_started: { label: "Не начато",     color: "var(--s-not-started)", icon: "○" },
+  in_progress: { label: "В работе",      color: "var(--s-in-progress)", icon: "◐" },
+  done:        { label: "Готово",        color: "var(--s-done)",        icon: "✓" },
+  blocked:     { label: "Заблокировано", color: "var(--s-blocked)",     icon: "✕" },
+  cancelled:   { label: "Отменено",      color: "var(--s-cancelled)",   icon: "⊘" },
 };
+function statusBadge(status) {
+  const m = STATUS_META[status];
+  return `<span class="status-badge"><span class="ic" style="color:${m.color}">${m.icon}</span>${m.label}</span>`;
+}
 const STATUS_ORDER = ["not_started", "in_progress", "done", "blocked", "cancelled"];
 
 // Данные — снимок docs/org-tasks/registry.csv на 2026-07-26
 const TASKS = [
 {id:"ORG-038",title:"Перенести HTML-дашборды/отчёты с временного хостинга (GitHub Pages, публичный) на собственный хостинг проекта",source:"chat:2026-07-26",source_date:"2026-07-26",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-26",notes:"Цель — приватность: сейчас репозиторий briefs публичный, доступен кому угодно по ссылке; свой хостинг закроет доступ так, чтобы дашборды видели только мы."},
-{id:"ORG-037",title:"Зарегистрировать аккаунт Notion (бесплатный тариф) для документации и задач",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Из решения 5.2 протокола встречи."},
+{id:"ORG-037",title:"Зарегистрировать аккаунт Notion (бесплатный тариф) для документации и задач",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"done",status_date:"2026-07-26",notes:"Workspace создан, GitHub MCP и Notion MCP подключены и используются."},
 {id:"ORG-029",title:"Развернуть инфраструктуру («чёрный ящик») по согласованному скоупу (~22 часа при темпе 3 ч/день)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"~1 неделя от начала работ (точная дата не зафиксирована)"},
 {id:"ORG-030",title:"Прислать финальную версию документа с зафиксированным выбором backend-фреймворка (Python/FastAPI)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
-{id:"ORG-031",title:"Утвердить домен(ы) как собственник проекта перед регистрацией",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
-{id:"ORG-032",title:"Завести отдельную «сквозную» почту для регистрации всех сервисов проекта и передать доступ PO",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Возможно, тот же пункт, что и ORG-001 — сверить."},
+{id:"ORG-031",title:"Утвердить домен(ы) как собственник проекта перед регистрацией",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Собственник",planned_date:"",status:"cancelled",status_date:"2026-07-26",notes:"Дубль ORG-014 — та же задача, закрывается здесь как дублирующая запись; сама задача (утверждение домена) ещё активна, см. ORG-014."},
+{id:"ORG-032",title:"Завести отдельную «сквозную» почту для регистрации всех сервисов проекта и передать доступ PO",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Собственник",planned_date:"",status:"cancelled",status_date:"2026-07-22",notes:"Дубль ORG-001 — задача фактически выполнена 2026-07-22 (см. ORG-001), закрывается здесь как дублирующая запись, а не как невыполненная."},
 {id:"ORG-033",title:"Передать логотип (векторный формат) PO и разработчикам",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Логотип уже готов по словам собственника (п.9.1)"},
-{id:"ORG-034",title:"Приобрести 3 лицензии AI-инструмента (по 30$ за лицензию)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
-{id:"ORG-035",title:"Создать Telegram-группу проекта",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"Срок не зафиксирован — уточнить"},
+{id:"ORG-034",title:"Приобрести 3 лицензии AI-инструмента (по 30$ за лицензию)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"cancelled",status_date:"2026-07-26",notes:"Дубль ORG-002 — там же трекается покупка подписки/лицензий."},
+{id:"ORG-035",title:"Создать Telegram-группу проекта",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO",planned_date:"",status:"done",status_date:"2026-07-26",notes:""},
 {id:"ORG-036",title:"Подготовить документ по безопасности (защита сервера, секреты)",source:"meeting:2026-07-21",source_date:"2026-07-21",owner:"PO + Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-21",notes:"По готовности окружения (условие, не дата)"},
-{id:"ORG-001",title:"Завести отдельную почту для регистрации сервисов проекта, дать доступ Product owner",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"Возможно, тот же пункт, что и ORG-032 — сверить"},
-{id:"ORG-002",title:"Купить подписку Claude (платный тариф)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-001",title:"Завести отдельную почту для регистрации сервисов проекта, дать доступ PO",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственник",planned_date:"",status:"done",status_date:"2026-07-22",notes:"Почта зарегистрирована собственником, доступ передан PO — оба действия 2026-07-22. Дублировала ORG-032 — та запись закрыта как дубль."},
+{id:"ORG-002",title:"Купить подписку Claude (платный тариф)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"in_progress",status_date:"2026-07-26",notes:"Куплено для PO. Для собственника пока не куплено — см. также ORG-034 (дубль)."},
 {id:"ORG-003",title:"Выбрать язык/фреймворк backend",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO + Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"На встрече 2026-07-21 прозвучало решение (Python/FastAPI, п.10.1) — уточнить, считать ли задачу закрытой до прихода финального документа (см. ORG-030)"},
 {id:"ORG-004",title:"Создать приватный репозиторий на GitHub и базовую структуру папок согласно gip-architecture.md",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"done",status_date:"2026-07-26",notes:"Выполнено через Claude Code + GitHub MCP"},
 {id:"ORG-005",title:"Настроить защиту ветки main на GitHub (branch protection): запретить прямой push, обязательный Pull Request перед мержем",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"blocked",status_date:"2026-07-26",notes:"GitHub не даёт включить branch protection на приватном репо бесплатного личного аккаунта — нужен GitHub Pro (~$4/мес) или перевод в Team-организацию."},
@@ -425,6 +412,7 @@ function renderGroups() {
           <div class="task-row" data-id="${t.id}">
             <div class="line1">
               <span class="id">${t.id}</span>
+              ${statusBadge(t.status)}
               <span class="title2">${t.title}</span>
               <span class="owner">${t.owner}</span>
             </div>
