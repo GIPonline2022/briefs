@@ -39,6 +39,15 @@
     margin: 0 auto;
     padding: 32px 20px 80px;
   }
+  @media (max-width: 480px) {
+    .wrap { padding: 18px 10px 60px; }
+    .kpi { padding: 12px 10px; }
+    .chart { padding: 14px 12px 10px; }
+    .bar-row { grid-template-columns: 88px 1fr 32px; gap: 6px; }
+    .group-header { padding: 12px 10px; }
+    .task-row { padding: 10px 10px 10px 12px; }
+    .subgroup-header { padding: 8px 10px 4px 12px; }
+  }
   header h1 {
     font-size: 22px;
     font-weight: 600;
@@ -101,6 +110,8 @@
     border-radius: 6px;
   }
   .bar-row:hover { background: var(--page-plane); }
+  .bar-row.active { background: var(--page-plane); box-shadow: inset 0 0 0 1.5px var(--baseline); }
+  .bar-row.active .name { color: var(--text-primary); font-weight: 600; }
   .bar-row .name {
     font-size: 13px;
     color: var(--text-secondary);
@@ -227,23 +238,21 @@
     color: var(--text-secondary);
     flex: none;
   }
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    padding: 2px 9px 2px 7px;
-    border-radius: 999px;
-    background: var(--page-plane);
-    border: 1px solid var(--border);
-    flex: none;
-    white-space: nowrap;
-  }
-  .status-badge .ic {
+  .status-ic {
     font-weight: 700;
-    line-height: 1;
+    font-size: 13px;
+    margin-left: 4px;
+  }
+  .subgroup-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px 4px 36px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
   }
   .task-row .detail {
     display: none;
@@ -279,7 +288,7 @@
   </div>
 
   <div class="controls">
-    <span class="lbl">Группировать по:</span>
+    <span class="lbl">Сначала группировать по:</span>
     <div class="seg" id="groupSeg">
       <button data-group="status" class="active">Статусу</button>
       <button data-group="owner">Ответственному</button>
@@ -300,10 +309,6 @@ const STATUS_META = {
   blocked:     { label: "Заблокировано", color: "var(--s-blocked)",     icon: "✕" },
   cancelled:   { label: "Отменено",      color: "var(--s-cancelled)",   icon: "⊘" },
 };
-function statusBadge(status) {
-  const m = STATUS_META[status];
-  return `<span class="status-badge"><span class="ic" style="color:${m.color}">${m.icon}</span>${m.label}</span>`;
-}
 const STATUS_ORDER = ["not_started", "in_progress", "done", "blocked", "cancelled"];
 
 // Данные — снимок docs/org-tasks/registry.csv на 2026-07-26
@@ -361,43 +366,84 @@ const kpiDefs = [
   { label: "В работе", value: counts.in_progress, cls: "" },
   { label: "Заблокировано", value: counts.blocked, cls: "critical" },
   { label: "Не начато", value: counts.not_started, cls: "" },
+  { label: "Отменено", value: counts.cancelled, cls: "" },
 ];
 document.getElementById("kpis").innerHTML = kpiDefs.map(k =>
   `<div class="kpi ${k.cls}"><div class="label">${k.label}</div><div class="value">${k.value}</div></div>`
 ).join("");
 
-// ---- Bar chart (status breakdown, categorical, clickable -> filters groups) ----
-const maxCount = Math.max(...STATUS_ORDER.map(s => counts[s]), 1);
-const barChartEl = document.getElementById("barChart");
-barChartEl.innerHTML = STATUS_ORDER.map(s => {
-  const meta = STATUS_META[s];
-  const pct = Math.round((counts[s] / maxCount) * 100);
-  return `<div class="bar-row" data-status="${s}">
-    <div class="name">${meta.label}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${meta.color}"></div></div>
-    <div class="count">${counts[s]}</div>
-  </div>`;
-}).join("");
-
-// ---- Grouping + rows ----
+// ---- State ----
 let currentGroup = "status";
-let activeFilter = null; // status key when filtered from chart click
+let activeFilter = null; // status key when filtered from chart click — independent of currentGroup
+
+// ---- Bar chart (status breakdown, categorical, clickable -> filters, doesn't change grouping) ----
+const barChartEl = document.getElementById("barChart");
+function renderBarChart() {
+  const maxCount = Math.max(...STATUS_ORDER.map(s => counts[s]), 1);
+  barChartEl.innerHTML = STATUS_ORDER.map(s => {
+    const meta = STATUS_META[s];
+    const pct = Math.round((counts[s] / maxCount) * 100);
+    return `<div class="bar-row${activeFilter === s ? " active" : ""}" data-status="${s}">
+      <div class="name">${meta.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${meta.color}"></div></div>
+      <div class="count">${counts[s]}</div>
+    </div>`;
+  }).join("");
+}
+
+// ---- Grouping + rows (two levels: primary group, secondary sub-group) ----
+function statusIconOnly(status) {
+  const m = STATUS_META[status];
+  return `<span class="status-ic" style="color:${m.color}" title="${m.label}">${m.icon}</span>`;
+}
+
+function taskRowHtml(t) {
+  return `
+    <div class="task-row" data-id="${t.id}">
+      <div class="line1">
+        <span class="id">${t.id}${statusIconOnly(t.status)}</span>
+        <span class="title2">${t.title}</span>
+        <span class="owner">${t.owner}</span>
+      </div>
+      <div class="detail">
+        <b>Источник:</b> ${t.source} (${t.source_date})<br>
+        <b>Статус:</b> ${STATUS_META[t.status].label} (с ${t.status_date})${t.planned_date ? `<br><b>Плановый срок:</b> ${t.planned_date}` : ""}
+        ${t.notes ? `<br><b>Заметки:</b> ${t.notes}` : ""}
+      </div>
+    </div>`;
+}
+
+function subgroupsHtml(items, secondaryBy) {
+  if (!secondaryBy) return items.map(taskRowHtml).join("");
+  let subs;
+  if (secondaryBy === "owner") {
+    const owners = [...new Set(items.map(t => t.owner))].sort();
+    subs = owners.map(o => ({ label: o, items: items.filter(t => t.owner === o) }));
+  } else {
+    subs = STATUS_ORDER
+      .map(s => ({ label: `${STATUS_META[s].icon} ${STATUS_META[s].label}`, items: items.filter(t => t.status === s) }))
+      .filter(g => g.items.length);
+  }
+  return subs.map(sg => `<div class="subgroup-header">${sg.label} · ${sg.items.length}</div>${sg.items.map(taskRowHtml).join("")}`).join("");
+}
 
 function renderGroups() {
   const groupsEl = document.getElementById("groups");
-  let filtered = activeFilter ? TASKS.filter(t => t.status === activeFilter) : TASKS;
-
-  const byStatusOrder = (items) => [...items].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const filtered = activeFilter ? TASKS.filter(t => t.status === activeFilter) : TASKS;
 
   let buckets = [];
+  let secondaryBy = null;
   if (currentGroup === "status") {
+    secondaryBy = "owner";
     buckets = STATUS_ORDER
       .map(s => ({ key: s, label: STATUS_META[s].label, color: STATUS_META[s].color, items: filtered.filter(t => t.status === s) }))
       .filter(b => b.items.length);
   } else if (currentGroup === "owner") {
+    secondaryBy = "status";
     const owners = [...new Set(filtered.map(t => t.owner))].sort();
-    buckets = owners.map(o => ({ key: o, label: o, color: "var(--text-muted)", items: byStatusOrder(filtered.filter(t => t.owner === o)) }));
+    buckets = owners.map(o => ({ key: o, label: o, color: "var(--text-muted)", items: filtered.filter(t => t.owner === o) }));
   } else {
+    const byStatusOrder = (items) => [...items].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
     buckets = [{ key: "all", label: "Все задачи", color: "var(--text-muted)", items: byStatusOrder(filtered) }];
   }
 
@@ -409,23 +455,7 @@ function renderGroups() {
         <span class="n">${b.items.length}</span>
         <span class="chev">&#9660;</span>
       </div>
-      <div class="rows">
-        ${b.items.map(t => `
-          <div class="task-row" data-id="${t.id}">
-            <div class="line1">
-              <span class="id">${t.id}</span>
-              ${statusBadge(t.status)}
-              <span class="title2">${t.title}</span>
-              <span class="owner">${t.owner}</span>
-            </div>
-            <div class="detail">
-              <b>Источник:</b> ${t.source} (${t.source_date})<br>
-              <b>Статус с:</b> ${t.status_date}${t.planned_date ? `<br><b>Плановый срок:</b> ${t.planned_date}` : ""}
-              ${t.notes ? `<br><b>Заметки:</b> ${t.notes}` : ""}
-            </div>
-          </div>
-        `).join("")}
-      </div>
+      <div class="rows">${subgroupsHtml(b.items, secondaryBy)}</div>
     </div>
   `).join("");
 
@@ -451,9 +481,11 @@ barChartEl.addEventListener("click", (e) => {
   if (!row) return;
   const status = row.dataset.status;
   activeFilter = (activeFilter === status) ? null : status;
-  document.querySelector('#groupSeg button[data-group="status"]').click();
+  renderBarChart();
+  renderGroups();
 });
 
+renderBarChart();
 renderGroups();
 </script>
 </body>
