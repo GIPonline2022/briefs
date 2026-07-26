@@ -387,6 +387,8 @@ function renderGroups() {
   const groupsEl = document.getElementById("groups");
   let filtered = activeFilter ? TASKS.filter(t => t.status === activeFilter) : TASKS;
 
+  const byStatusOrder = (items) => [...items].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+
   let buckets = [];
   if (currentGroup === "status") {
     buckets = STATUS_ORDER
@@ -394,9 +396,9 @@ function renderGroups() {
       .filter(b => b.items.length);
   } else if (currentGroup === "owner") {
     const owners = [...new Set(filtered.map(t => t.owner))].sort();
-    buckets = owners.map(o => ({ key: o, label: o, color: "var(--text-muted)", items: filtered.filter(t => t.owner === o) }));
+    buckets = owners.map(o => ({ key: o, label: o, color: "var(--text-muted)", items: byStatusOrder(filtered.filter(t => t.owner === o)) }));
   } else {
-    buckets = [{ key: "all", label: "Все задачи", color: "var(--text-muted)", items: filtered }];
+    buckets = [{ key: "all", label: "Все задачи", color: "var(--text-muted)", items: byStatusOrder(filtered) }];
   }
 
   groupsEl.innerHTML = buckets.map(b => `
