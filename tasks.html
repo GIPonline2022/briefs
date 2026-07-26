@@ -43,7 +43,7 @@
     .wrap { padding: 18px 10px 60px; }
     .kpi { padding: 12px 10px; }
     .chart { padding: 14px 12px 10px; }
-    .bar-row { grid-template-columns: 88px 1fr 32px; gap: 6px; }
+    .bar-row { grid-template-columns: 88px 1fr 24px 14px; gap: 6px; }
     .group-header { padding: 12px 10px; }
     .task-row { padding: 10px 10px 10px 12px; }
     .subgroup-header { padding: 8px 10px 4px 12px; }
@@ -86,6 +86,19 @@
   }
   .kpi.good .value { color: var(--good); }
   .kpi.critical .value { color: var(--critical); }
+  .kpi.clickable { cursor: pointer; }
+  .kpi.clickable:hover { background: var(--page-plane); }
+  .kpi.active { background: var(--page-plane); box-shadow: inset 0 0 0 1.5px var(--baseline); }
+  .chart .hint {
+    margin: -8px 0 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .bar-row .chev {
+    color: var(--text-muted);
+    font-size: 11px;
+    flex: none;
+  }
 
   /* Bar chart */
   .chart {
@@ -102,12 +115,13 @@
   }
   .bar-row {
     display: grid;
-    grid-template-columns: 130px 1fr 44px;
+    grid-template-columns: 130px 1fr 30px 16px;
     align-items: center;
     gap: 10px;
     height: 32px;
     cursor: pointer;
     border-radius: 6px;
+    padding-right: 4px;
   }
   .bar-row:hover { background: var(--page-plane); }
   .bar-row.active { background: var(--page-plane); box-shadow: inset 0 0 0 1.5px var(--baseline); }
@@ -284,6 +298,7 @@
 
   <div class="chart">
     <h2>Задачи по статусу</h2>
+    <p class="hint">Нажми на статус — список ниже отфильтруется. Повторный клик снимает фильтр.</p>
     <div id="barChart"></div>
   </div>
 
@@ -361,20 +376,39 @@ STATUS_ORDER.forEach(s => counts[s] = 0);
 TASKS.forEach(t => counts[t.status] = (counts[t.status]||0) + 1);
 
 const kpiDefs = [
-  { label: "Всего задач", value: TASKS.length, cls: "" },
-  { label: "Готово", value: counts.done, cls: "good" },
-  { label: "В работе", value: counts.in_progress, cls: "" },
-  { label: "Заблокировано", value: counts.blocked, cls: "critical" },
-  { label: "Не начато", value: counts.not_started, cls: "" },
-  { label: "Отменено", value: counts.cancelled, cls: "" },
+  { label: "Всего задач", value: TASKS.length, cls: "", status: null },
+  { label: "Готово", value: counts.done, cls: "good", status: "done" },
+  { label: "В работе", value: counts.in_progress, cls: "", status: "in_progress" },
+  { label: "Заблокировано", value: counts.blocked, cls: "critical", status: "blocked" },
+  { label: "Не начато", value: counts.not_started, cls: "", status: "not_started" },
+  { label: "Отменено", value: counts.cancelled, cls: "", status: "cancelled" },
 ];
-document.getElementById("kpis").innerHTML = kpiDefs.map(k =>
-  `<div class="kpi ${k.cls}"><div class="label">${k.label}</div><div class="value">${k.value}</div></div>`
-).join("");
+const kpisEl = document.getElementById("kpis");
+function renderKpis() {
+  kpisEl.innerHTML = kpiDefs.map(k => {
+    const clickable = k.status ? " clickable" : "";
+    const active = (k.status && activeFilter === k.status) ? " active" : "";
+    const attr = k.status ? ` data-status="${k.status}"` : "";
+    return `<div class="kpi ${k.cls}${clickable}${active}"${attr}><div class="label">${k.label}</div><div class="value">${k.value}</div></div>`;
+  }).join("");
+}
 
 // ---- State ----
 let currentGroup = "status";
-let activeFilter = null; // status key when filtered from chart click — independent of currentGroup
+let activeFilter = null; // status key when filtered from chart/KPI click — independent of currentGroup
+
+function toggleFilter(status) {
+  activeFilter = (activeFilter === status) ? null : status;
+  renderKpis();
+  renderBarChart();
+  renderGroups();
+}
+
+kpisEl.addEventListener("click", (e) => {
+  const tile = e.target.closest(".kpi.clickable");
+  if (!tile) return;
+  toggleFilter(tile.dataset.status);
+});
 
 // ---- Bar chart (status breakdown, categorical, clickable -> filters, doesn't change grouping) ----
 const barChartEl = document.getElementById("barChart");
@@ -387,6 +421,7 @@ function renderBarChart() {
       <div class="name">${meta.label}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${meta.color}"></div></div>
       <div class="count">${counts[s]}</div>
+      <div class="chev">${activeFilter === s ? "✕" : "›"}</div>
     </div>`;
   }).join("");
 }
@@ -479,12 +514,10 @@ document.getElementById("groupSeg").addEventListener("click", (e) => {
 barChartEl.addEventListener("click", (e) => {
   const row = e.target.closest(".bar-row");
   if (!row) return;
-  const status = row.dataset.status;
-  activeFilter = (activeFilter === status) ? null : status;
-  renderBarChart();
-  renderGroups();
+  toggleFilter(row.dataset.status);
 });
 
+renderKpis();
 renderBarChart();
 renderGroups();
 </script>
