@@ -113,6 +113,23 @@
     font-weight: 600;
     margin: 0 0 14px;
   }
+  .chart.focus {
+    border-color: var(--s-blocked);
+    box-shadow: inset 0 0 0 1px var(--s-blocked);
+  }
+  .focus-row {
+    padding: 10px 0;
+    border-top: 1px solid var(--gridline);
+    cursor: pointer;
+  }
+  .focus-row:first-child { border-top: none; }
+  .focus-row .line1 { display: flex; align-items: baseline; gap: 10px; }
+  .focus-row .id { font-size: 12px; color: var(--text-muted); flex: none; }
+  .focus-row .title2 { font-size: 13px; color: var(--text-primary); flex: 1; }
+  .focus-row .owner { font-size: 12px; color: var(--text-secondary); flex: none; }
+  .focus-row .detail { display: none; margin-top: 6px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  .focus-row.open .detail { display: block; }
+  .focus-row .detail b { color: var(--text-primary); font-weight: 600; }
   .bar-row {
     display: grid;
     grid-template-columns: 130px 1fr 30px 16px;
@@ -296,6 +313,11 @@
 
   <div class="kpis" id="kpis"></div>
 
+  <div class="chart focus" id="focusSection" style="display:none">
+    <h2>Первоочередное</h2>
+    <div id="focusList"></div>
+  </div>
+
   <div class="chart">
     <h2>Задачи по статусу</h2>
     <p class="hint">Нажми на статус — список ниже отфильтруется. Повторный клик снимает фильтр.</p>
@@ -345,13 +367,13 @@ const TASKS = [
 {id:"ORG-005",title:"Настроить защиту ветки main на GitHub (branch protection): запретить прямой push, обязательный Pull Request перед мержем",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"blocked",status_date:"2026-07-26",notes:"GitHub не даёт включить branch protection на приватном репо бесплатного личного аккаунта — нужен GitHub Pro (~$4/мес) или перевод в Team-организацию."},
 {id:"ORG-006",title:"Подключить Claude Code к репозиторию (установка, авторизация GitHub, клонирование)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"done",status_date:"2026-07-26",notes:"Локальный клон настроен, git push/pull работают, Claude Code работает с репозиторием напрямую."},
 {id:"ORG-007",title:"Подключить собственника к репозиторию с правами только на чтение, а также подключить его Claude к репозиторию",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"Ждём GitHub-логин собственника"},
-{id:"ORG-008",title:"Зарегистрироваться у хостинг-провайдера (Hetzner Cloud; план Б — DigitalOcean/Vultr)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
-{id:"ORG-009",title:"Арендовать VPS (конфигурация CX22 или аналог, образ — Ubuntu Server 24.04 LTS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
+{id:"ORG-008",title:"Зарегистрироваться у хостинг-провайдера (Hetzner Cloud; план Б — DigitalOcean/Vultr)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",in_focus:true,notes:"Разблокирует ~15 нижестоящих задач."},
+{id:"ORG-009",title:"Арендовать VPS (конфигурация CX22 или аналог, образ — Ubuntu Server 24.04 LTS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",in_focus:true,notes:"Зависит от ORG-008."},
 {id:"ORG-010",title:"Настроить SSH-доступ к серверу (для Product owner и Разработчика)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
 {id:"ORG-011",title:"Настроить базовый файрвол на сервере (ufw): разрешить только SSH/HTTP/HTTPS",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
 {id:"ORG-012",title:"Установить Docker + Docker Compose",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
 {id:"ORG-013",title:"Установить Node.js на сервере (для Claude Code CLI в SSH-сессии)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
-{id:"ORG-014",title:"Утвердить домен у собственников (giptrans.cc / giptrans.co)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:"См. также ORG-031"},
+{id:"ORG-014",title:"Утвердить домен у собственников (giptrans.cc / giptrans.co)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Собственник",planned_date:"",status:"not_started",status_date:"2026-07-17",in_focus:true,notes:"См. также ORG-031. Ждёт собственника."},
 {id:"ORG-015",title:"Зарегистрировать утверждённый домен",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"PO",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
 {id:"ORG-016",title:"Подключить домен к Cloudflare (DNS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
 {id:"ORG-017",title:"Настроить Nginx + Let's Encrypt (TLS)",source:"gip-deployment-plan.md",source_date:"2026-07-17",owner:"Разработчик",planned_date:"",status:"not_started",status_date:"2026-07-17",notes:""},
@@ -448,6 +470,34 @@ function taskRowHtml(t) {
     </div>`;
 }
 
+// ---- Focus section (in_focus === true only; hidden entirely if none) ----
+function renderFocus() {
+  const focusSectionEl = document.getElementById("focusSection");
+  const focusListEl = document.getElementById("focusList");
+  const items = TASKS.filter(t => t.in_focus);
+  if (!items.length) {
+    focusSectionEl.style.display = "none";
+    return;
+  }
+  focusSectionEl.style.display = "";
+  focusListEl.innerHTML = items.map(t => `
+    <div class="focus-row" data-id="${t.id}">
+      <div class="line1">
+        <span class="id">${t.id}${statusIconOnly(t.status)}</span>
+        <span class="title2">${t.title}</span>
+        <span class="owner">${t.owner}</span>
+      </div>
+      <div class="detail">
+        <b>Источник:</b> ${t.source} (${t.source_date})<br>
+        <b>Статус:</b> ${STATUS_META[t.status].label} (с ${t.status_date})
+        ${t.notes ? `<br><b>Заметки:</b> ${t.notes}` : ""}
+      </div>
+    </div>`).join("");
+  focusListEl.querySelectorAll(".focus-row").forEach(r => {
+    r.addEventListener("click", () => r.classList.toggle("open"));
+  });
+}
+
 function subgroupsHtml(items, secondaryBy) {
   if (!secondaryBy) return items.map(taskRowHtml).join("");
   let subs;
@@ -517,6 +567,7 @@ barChartEl.addEventListener("click", (e) => {
   toggleFilter(row.dataset.status);
 });
 
+renderFocus();
 renderKpis();
 renderBarChart();
 renderGroups();
