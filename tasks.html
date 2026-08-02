@@ -297,6 +297,29 @@
   .task-row.open .detail { display: block; }
   .task-row .detail b { color: var(--text-primary); font-weight: 600; }
 
+  .progress-block h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    margin: 14px 0 6px;
+  }
+  .progress-block p.lead {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 4px;
+  }
+  .progress-block ul {
+    margin: 0 0 14px;
+    padding-left: 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .progress-block ul:last-child { margin-bottom: 0; }
+
   footer {
     margin-top: 24px;
     font-size: 12px;
@@ -334,6 +357,27 @@
   </div>
 
   <div id="groups"></div>
+
+  <div class="chart progress-block">
+    <h2>Прогресс разработки — MVP</h2>
+    <p class="hint">Снимок на 2026-08-02 · по сути сделанного, не по числу файлов</p>
+    <p class="lead">Разработчик передал в репозиторий рабочий MVP учётной системы: backend, мобильная форма отчёта водителя, административная панель.</p>
+    <h3>Что работает</h3>
+    <ul>
+      <li>Вход через Google, собственные сессии с защитой от кражи токена, мгновенный отзыв доступа</li>
+      <li>Три роли (водитель / бухгалтер / админ) с разграничением прав</li>
+      <li>Мобильная форма отчёта водителя: машина, заправки, фото чека в приватное хранилище, черновик не теряется</li>
+      <li>Административная панель: рейсы, расходы, пользователи, автомобили, сводка прибыли/убытка за период</li>
+      <li>Автоматические тесты на ключевую логику (доступ, права, безопасность)</li>
+    </ul>
+    <h3>Что ещё не сделано</h3>
+    <ul>
+      <li>Прод и тестовое окружение пока не разделены на сервере</li>
+      <li>Домен и шифрование (HTTPS) не подключены — без этого вход через Google не заработает на реальном адресе</li>
+      <li>Автоматического деплоя, резервного копирования базы и мониторинга пока нет</li>
+      <li>Первого администратора приходится заводить вручную (не через интерфейс)</li>
+    </ul>
+  </div>
 
   <footer>Данные из <code>docs/org-tasks/registry.csv</code> репозитория GIPonline · обновляется вручную, не в реальном времени</footer>
 </div>
