@@ -23,6 +23,7 @@
     --s-in-progress:  #eb6834;
     --s-done:         #1baf7a;
     --s-blocked:      #eda100;
+    --s-deferred:     #8a8f98;
     --s-cancelled:    #e87ba4;
   }
   /* Тема зафиксирована на светлой — не зависит от системной темы устройства */
@@ -327,7 +328,7 @@
   }
 </style>
 </head>
-<body data-palette="#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4">
+<body data-palette="#2a78d6,#eb6834,#1baf7a,#eda100,#8a8f98,#e87ba4">
 <div class="viz-root wrap">
   <header>
     <h1>GIP.online — статус задач</h1>
@@ -397,9 +398,10 @@ const STATUS_META = {
   in_progress: { label: "В работе",      color: "var(--s-in-progress)", icon: "◐" },
   done:        { label: "Готово",        color: "var(--s-done)",        icon: "✓" },
   blocked:     { label: "Заблокировано", color: "var(--s-blocked)",     icon: "✕" },
+  deferred:    { label: "Отложено",      color: "var(--s-deferred)",    icon: "⏸" },
   cancelled:   { label: "Отменено",      color: "var(--s-cancelled)",   icon: "⊘" },
 };
-const STATUS_ORDER = ["not_started", "in_progress", "done", "blocked", "cancelled"];
+const STATUS_ORDER = ["not_started", "in_progress", "done", "blocked", "deferred", "cancelled"];
 
 // Данные — снимок docs/org-tasks/registry.csv на 2026-08-05
 const TASKS = [
@@ -464,12 +466,15 @@ const counts = {};
 STATUS_ORDER.forEach(s => counts[s] = 0);
 TASKS.forEach(t => counts[t.status] = (counts[t.status]||0) + 1);
 
+// "Всего задач" — активные статусы, без deferred (осознанно отложено PO, не в счёт общего объёма)
+const totalActive = TASKS.length - counts.deferred;
 const kpiDefs = [
-  { label: "Всего задач", value: TASKS.length, cls: "", status: null },
+  { label: "Всего задач", value: totalActive, cls: "", status: null },
   { label: "Готово", value: counts.done, cls: "good", status: "done" },
   { label: "В работе", value: counts.in_progress, cls: "", status: "in_progress" },
   { label: "Заблокировано", value: counts.blocked, cls: "critical", status: "blocked" },
   { label: "Не начато", value: counts.not_started, cls: "", status: "not_started" },
+  { label: "Отложено", value: counts.deferred, cls: "", status: "deferred" },
   { label: "Отменено", value: counts.cancelled, cls: "", status: "cancelled" },
 ];
 const kpisEl = document.getElementById("kpis");
