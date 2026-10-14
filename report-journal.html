@@ -165,6 +165,8 @@ button, input, select, textarea { font: inherit; color: var(--text); }
 .go-kv > span:first-child { color: var(--muted); }
 .go-kv > span:last-child { font-weight: 600; text-align: right; }
 .go-kv small { display: block; color: var(--muted); font-weight: 400; }
+.go-tip { cursor: help; }
+.go-tip i { font-style: normal; color: var(--muted); font-size: 13px; }
 .go-attn { margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--text); }
 .go-attn h2 { margin: 0 0 6px; font-size: 16px; color: var(--warn); }
 .go-attn p { margin: 4px 0; }
@@ -312,7 +314,10 @@ function fmtDate(iso) { return iso.split('-').reverse().join('.'); }
 function short(iso) { var p = iso.split('-'); return p[2] + '.' + p[1]; }
 function low(s) { s = String(s == null ? '' : s); return s.charAt(0).toLowerCase() + s.slice(1); }
 function byId(list, id) { return list.filter(function (x) { return x.id === id; })[0] || null; }
-function kv(a, b) { return '<div class="go-kv"><span>' + a + '</span><span>' + b + '</span></div>'; }
+// hint — подсказка при наведении на подпись; значок ⓘ показывает, что она есть (ТЗ-014, п. 3.7)
+function kv(a, b, hint) {
+  return '<div class="go-kv"><span' + (hint ? ' class="go-tip" title="' + esc(hint) + '"' : '') + '>' + a + (hint ? ' <i>ⓘ</i>' : '') + '</span><span>' + b + '</span></div>';
+}
 function days(a, b) { var x = a.split('-').map(Number), y = b.split('-').map(Number); return Math.round((Date.UTC(y[0], y[1] - 1, y[2]) - Date.UTC(x[0], x[1] - 1, x[2])) / 864e5); }
 // 1 день, 2 дні, 5 днів, 11 днів, 21 день
 function plural(n, one, few, many) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? one : (a >= 2 && a <= 4 && (b < 12 || b > 14)) ? few : many; }
@@ -485,7 +490,7 @@ var NOTE = {   // пояснения — для собственника и ра
   acts: 'Скопіювати для таблиці — у подтверждённого отчёта; у проведённого — с предупреждением о дублях. Провести — только подтверждённый и не проведённый. Підтвердити — отчёт проверен; отчёт на исправлении — только после вопроса: водитель, возможно, как раз его правит, и после подтверждения отправить правку уже не сможет. Повернути водієві — с обязательным замечанием, водитель увидит его у себя (ТЗ-007, п. 3.4). Провести — отчёт перенесён в таблицу бухгалтерии руками; проведённый не меняет никто, пока проведение не отменят (п. 3.9). Скасувати підтвердження — по праву подтверждать, скасувати повернення — по праву возвращать (п. 3.3). Пометить на удаление нельзя отчёт на исправлении и проведённый (п. 3.10).',
   hist: 'Что система помнит о движении отчёта — только последнее событие каждого вида (ТЗ-007, п. 3.5). «Проведено» отдельно не хранится: проведённый отчёт не меняется, значит проведение — его последняя запись, и кто и когда провёл, дают общие реквизиты «Автор последний» и «Изменён» (ТЗ-009, п. 3.3.1).',
   next: '«Наступний» — следующий отчёт той же вкладки: очередь проверяют, не возвращаясь в журнал.',
-  help: '<b>«? Довідка»</b> — памятка для сотрудников офиса, она есть у каждого журнала (ТЗ-014, п. 3.7). Текст пишет ТЗ вида — для этого журнала ТЗ-005 — и он идёт через словарь, на обоих языках. При наведении мыши на вкладку, состояние или пометку — короткая подсказка. Не путать с «Пояснення»: они для собственника и разработчика и в продукт не попадают.',
+  help: '<b>«? Довідка»</b> — памятка для сотрудников офиса, она есть у каждого журнала (ТЗ-014, п. 3.7). Текст пишет ТЗ вида — для этого журнала ТЗ-005 — и он идёт через словарь, на обоих языках. Подсказка при наведении — одной фразой, что это и что произойдёт: на вкладках, состояниях, пометках, кнопках действий, периоде, поиске, фильтрах, заголовках колонок и подписях карточки со значком ⓘ. Цель — чтобы за объяснением не приходилось лезть в памятку (PO, 2026-10-14). Не путать с «Пояснення»: они для собственника и разработчика и в продукт не попадают.',
   acc: '<b>Кто вошёл и выход</b> — часть рамки приложения (ядро), одинаковы во всех разделах. «Вийти» спрятан в меню под именем, чтобы не нажать случайно. Выход завершает сессию в этом браузере — и в мобильной версии тоже: сессия одна на весь домен (ТЗ-008, п. 3.15). Запомненный период остаётся в браузере у этого пользователя. Вход — через Google, только для допущенных (ТЗ-013).',
   login: 'Экран входа — имитация, настоящий вход описан в ТЗ-013. В прототипе «Увійти» возвращает того же сотрудника на стартовую страницу.'
 };
@@ -567,17 +572,17 @@ var COLS = [
   { id: 'driver', title: 'Водій', text: 1, key: function (r) { return r.driverName; } },
   { id: 'vehicle', title: 'Автомобіль', text: 1, key: function (r) { return r.vehicleName; } },
   { id: 'route', title: 'Маршрут', text: 1, key: function (r) { return r.routeName; } },
-  { id: 'mileage', title: 'Пробіг, км', num: 1, key: function (r) { return r.mileage; } },
-  { id: 'liters', title: 'Заправки, л', num: 1, key: function (r) { return r.refills.length ? r.refills.reduce(function (s, x) { return s + x.liters; }, 0) : null; } },
-  { id: 'flags', title: 'Позначки' },
-  { id: 'state', title: 'Стан', key: function (r) { return r.deleted ? 9 : (r.posted ? 4 : STATE_ORDER[r.state]); } }
+  { id: 'mileage', title: 'Пробіг, км', hint: 'Спідометр на кінець мінус на початок', num: 1, key: function (r) { return r.mileage; } },
+  { id: 'liters', title: 'Заправки, л', hint: 'Літри всіх заправок рейсу — і в бак, і в реф', num: 1, key: function (r) { return r.refills.length ? r.refills.reduce(function (s, x) { return s + x.liters; }, 0) : null; } },
+  { id: 'flags', title: 'Позначки', hint: 'Що варто перевірити. Наведіть на позначку — побачите подробиці' },
+  { id: 'state', title: 'Стан', hint: 'Стан звіту. Наведіть на значок — побачите пояснення', key: function (r) { return r.deleted ? 9 : (r.posted ? 4 : STATE_ORDER[r.state]); } }
 ];
 // Колонки вкладки «Без звіту»: срок сдачи — дата плюс постоянная глубина, поэтому сортируется по дате.
 var MCOLS = [
   { id: 'mdate', title: 'Дата рейсу', key: function (x) { return x.date; } },
   { id: 'mvehicle', title: 'Автомобіль', text: 1, key: function (x) { return x.vehicle.name; } },
-  { id: 'mlast', title: 'Останній звіт по машині', text: 1, key: function (x) { return x.last ? x.last.driverName : null; } },
-  { id: 'mdue', title: 'Здати можна', key: function (x) { return x.date; } }
+  { id: 'mlast', title: 'Останній звіт по машині', hint: 'Водій останнього звіту по цій машині — кому телефонувати', text: 1, key: function (x) { return x.last ? x.last.driverName : null; } },
+  { id: 'mdue', title: 'Здати можна', hint: 'Після цього дня звіт за цей рейс уже не здати', key: function (x) { return x.date; } }
 ];
 
 // Фильтры журнала отчётов (ТЗ-005): по какому реквизиту и какие значения даёт отчёт — [id, что показать].
@@ -637,14 +642,15 @@ var GipReportJournal = {
     }
     function th(c, cls) {
       var on = st.sort && st.sort.col === c.id;
-      if (!c.key) return '<th' + (cls ? ' class="' + cls + '"' : '') + '>' + c.title + '</th>';
+      if (!c.key) return '<th' + (cls ? ' class="' + cls + '"' : '') + (c.hint ? ' title="' + esc(c.hint) + '"' : '') + '>' + c.title + '</th>';
       return '<th class="' + (cls || '') + (on ? ' sorted' : '') + '" aria-sort="' + (on ? (st.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' +
-        '<button type="button" class="go-sort" data-act="sort" data-id="' + c.id + '" title="Сортувати за цим стовпцем">' + c.title + (on ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
+        '<button type="button" class="go-sort" data-act="sort" data-id="' + c.id + '" title="' + esc((c.hint ? c.hint + '. ' : '') + 'Натисніть, щоб сортувати') + '">' + c.title + (on ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
     }
     // Колонка «Чекає» / «Повернуто» — только на вкладках, где важно, сколько отчёт ждёт.
     function docCols() {
       if (wanted() || (st.tab !== 'check' && st.tab !== 'driver')) return COLS;
       return COLS.concat([{ id: 'wait', title: st.tab === 'check' ? 'Чекає' : 'Повернуто', num: 1,
+        hint: st.tab === 'check' ? 'Скільки днів звіт чекає перевірки' : 'Скільки днів тому звіт повернули водієві',
         key: function (r) { return days(st.tab === 'check' ? r.submittedAt : (r.returnedAt || r.date), today); } }]);
     }
     function rows() {
@@ -741,7 +747,7 @@ var GipReportJournal = {
       if (st.tab === 'check' && !wanted()) extra = '<td class="num">' + waitText(r.submittedAt) + '</td>';
       if (st.tab === 'driver' && !wanted()) extra = '<td class="num">' + waitText(r.returnedAt || r.date) + '</td>';
       return '<tr class="' + (st.sel[r.number] ? 'sel ' : '') + (r.deleted ? 'del' : '') + '" data-act="open" data-id="' + r.number + '">' +
-        (canBatch() ? '<td class="chk"><input type="checkbox" data-sel="' + r.number + '"' + (st.sel[r.number] ? ' checked' : '') + ' aria-label="Вибрати звіт ' + r.number + '"></td>' : '') +
+        (canBatch() ? '<td class="chk"><input type="checkbox" data-sel="' + r.number + '"' + (st.sel[r.number] ? ' checked' : '') + ' aria-label="Вибрати звіт ' + r.number + '" title="Позначити звіт, щоб скопіювати' + (st.tab === 'transfer' ? ' або провести' : ' ще раз') + '"></td>' : '') +
         '<td>' + r.number + '</td><td>' + fmtDate(r.date) + '</td><td>' + esc(r.driverName) + '</td>' +
         '<td>' + esc(r.vehicleName) + (r.trailerName ? '<small>' + esc(r.trailerName) + '</small>' : '') + '</td>' +
         '<td>' + esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : '') + '</td>' +
@@ -755,13 +761,13 @@ var GipReportJournal = {
       var list = rows(), w = wanted(), pt = periodText(period), nsel = Object.keys(st.sel).length, h;
       h = '<div class="go-jhead"><h1 class="go-h1">Звіти водіїв</h1><button type="button" class="go-qbtn" data-act="help" title="Як працювати з журналом">? Довідка</button></div>' +
         '<div class="go-note">' + NOTE.help + '</div>';
-      h += '<div class="go-tools"><button type="button" class="go-period" data-act="period"><b>Період:</b> ' + pt[0] + ' <span>' + pt[1] + '</span> ▾</button>' +
-        '<form class="go-search" data-form="search"><input class="go-in" type="search" inputmode="numeric" placeholder="Пошук за номером" value="' + esc(st.q) + '" data-q="1" aria-label="Пошук за номером">' +
+      h += '<div class="go-tools"><button type="button" class="go-period" data-act="period" title="Період обмежує все: вкладки, лічильники й пошук"><b>Період:</b> ' + pt[0] + ' <span>' + pt[1] + '</span> ▾</button>' +
+        '<form class="go-search" data-form="search"><input class="go-in" type="search" inputmode="numeric" placeholder="Пошук за номером" title="Номер звіту, нулі попереду можна не вводити: «126» знайде 000126. Шукає в межах періоду" value="' + esc(st.q) + '" data-q="1" aria-label="Пошук за номером">' +
         '<button type="submit" class="go-btn">Знайти</button></form>' +
         // Строка фильтров свёрнута под кнопку; включённые фильтры видны и так: число на кнопке, рядом «Скинути фільтри».
-        (w ? '' : '<button type="button" class="go-fbtn' + (filtered() ? ' on' : '') + '" data-act="ftoggle" aria-expanded="' + !!st.fopen + '">Фільтри' +
+        (w ? '' : '<button type="button" class="go-fbtn' + (filtered() ? ' on' : '') + '" data-act="ftoggle" aria-expanded="' + !!st.fopen + '" title="Фільтри працюють разом, у межах періоду й на всіх вкладках; не запам’ятовуються">Фільтри' +
           (filtered() ? ': ' + nFilters() : '') + ' ' + (st.fopen ? '▴' : '▾') + '</button>' +
-          (filtered() ? '<button type="button" class="go-link" data-act="freset">Скинути фільтри</button>' : '')) +
+          (filtered() ? '<button type="button" class="go-link" data-act="freset" title="Прибрати всі фільтри">Скинути фільтри</button>' : '')) +
         (pop ? popHtml() : '') + '</div>';
       h += '<div class="go-note">' + NOTE.period + '</div><div class="go-note">' + NOTE.search + '</div>';
       if (!w && st.fopen) h += filtersHtml();
@@ -779,15 +785,15 @@ var GipReportJournal = {
       }
       if (!w && st.tab === 'missing') h += missingTable(); else
       h += '<div class="go-wrap"><table class="go-table"><thead><tr>' +
-        (canBatch() ? '<th class="chk"><input type="checkbox" data-selall="1" aria-label="Вибрати всі"' + (list.length && nsel === list.length ? ' checked' : '') + '></th>' : '') +
+        (canBatch() ? '<th class="chk"><input type="checkbox" data-selall="1" aria-label="Вибрати всі" title="Позначити всі звіти на вкладці"' + (list.length && nsel === list.length ? ' checked' : '') + '></th>' : '') +
         docCols().map(function (c) { return th(c, c.num ? 'num' : ''); }).join('') + '</tr></thead><tbody>' +
         (list.length ? list.map(rowHtml).join('') : '<tr><td colspan="11" class="go-empty">' + (w ? 'Нічого не знайдено.' : (filtered() ? 'За цей період із такими фільтрами нічого немає.' : 'За цей період тут нічого немає.')) + '</td></tr>') + '</tbody></table></div>';
       h += '<div class="go-note">' + NOTE.sort + '</div><div class="go-note">' + NOTE.flags + '</div><div class="go-note">' + NOTE.select + '</div><div class="go-note">' + NOTE.copy + '</div>';
       if (nsel && canBatch()) {
         h += '<div class="go-selbar"><span>Вибрано: <b>' + nsel + '</b></span>' +
-          '<button type="button" class="go-btn primary" data-act="copy">Скопіювати для таблиці</button>' +
-          (st.tab === 'transfer' ? '<button type="button" class="go-btn" data-act="postsel">Провести (' + nsel + ')</button>' : '') +
-          '<button type="button" class="go-link" data-act="unsel" style="color:#FFFFFF">Зняти вибір</button></div>';
+          '<button type="button" class="go-btn primary" data-act="copy" title="Рядки позначених звітів — у буфер обміну. Вставте їх у таблицю бухгалтерії, у порожні рядки">Скопіювати для таблиці</button>' +
+          (st.tab === 'transfer' ? '<button type="button" class="go-btn" data-act="postsel" title="Позначити звіти перенесеними в таблицю бухгалтерії. Проведений звіт ніхто не змінить, поки проведення не скасують">Провести (' + nsel + ')</button>' : '') +
+          '<button type="button" class="go-link" data-act="unsel" style="color:#FFFFFF" title="Зняти позначки з усіх рядків">Зняти вибір</button></div>';
       }
       if (help) h += helpHtml();
       el.innerHTML = h;
@@ -798,6 +804,7 @@ var GipReportJournal = {
     function helpHtml() {
       return '<div class="go-helpbg" data-act="helpclose"></div><aside class="go-help" role="dialog" aria-label="Довідка"><div class="go-helptop"><h2>Довідка: звіти водіїв</h2>' +
         '<button type="button" class="go-btn" data-act="helpclose" aria-label="Закрити довідку">✕</button></div>' +
+        '<p>Наведіть мишу на кнопку, вкладку, стан, позначку, заголовок стовпця чи підпис зі значком ⓘ — з’явиться коротка підказка.</p>' +
         HELP.map(function (x) { return '<h3>' + x[0] + '</h3>' + x[1]; }).join('') + '</aside>';
     }
     function popHtml() {
@@ -916,7 +923,19 @@ var GipOfficeReport = {
     var data = P.data, rights = ROLES[P.role].rights;
     function rep() { return data.reports.filter(function (r) { return r.number === P.report; })[0]; }
 
-    // Кнопки — по состоянию и правам (ТЗ-007, пп. 3.3, 3.9, 3.10; ТЗ-008, п. 3.5).
+    // Подсказка к кнопке — что произойдёт, одной фразой: за объяснением не надо лезть в памятку (ТЗ-014, п. 3.7).
+var ACT_HINT = {
+  approve: 'Звіт перевірено: його можна буде перенести в таблицю бухгалтерії',
+  sendback: 'Повернути водієві із зауваженням: він виправить звіт і відправить знову. Сповіщення водій не отримає',
+  unreturn: 'Скасувати повернення: звіт знову чекає перевірки',
+  unapprove: 'Скасувати підтвердження: звіт знову чекає перевірки',
+  copy: 'Рядок звіту — у буфер обміну, щоб вставити в таблицю бухгалтерії',
+  post: 'Позначити звіт перенесеним у таблицю бухгалтерії. Після цього його ніхто не змінить, поки проведення не скасують',
+  unpost: 'Скасувати проведення: звіт знову можна повернути водієві чи позначити на видалення',
+  delete: 'Для дубля або звіту про рейс, якого не було. Звіт лишиться видимим, але працювати з ним буде не можна',
+  undelete: 'Зняти позначку: зі звітом знову можна працювати'
+};
+// Кнопки — по состоянию и правам (ТЗ-007, пп. 3.3, 3.9, 3.10; ТЗ-008, п. 3.5).
     function actions(r) {
       var a = [];
       if (r.deleted) { if (rights.mark_deleted) a.push(['undelete', 'Зняти позначку на видалення', '']); return a; }
@@ -953,19 +972,20 @@ var GipOfficeReport = {
     function render() {
       var r = rep(), idx = P.list.indexOf(r.number), next = idx >= 0 ? P.list[idx + 1] : null, f = flagsOf(r, data), acts = actions(r), h;
       h = '<div class="go-nav"><button type="button" class="go-btn" data-act="back">‹ До журналу</button>' +
-        (next ? '<button type="button" class="go-btn" data-act="next">Наступний: № ' + next + ' ›</button>' : '') + '</div><div class="go-note">' + NOTE.next + '</div>';
+        (next ? '<button type="button" class="go-btn" data-act="next" title="Наступний звіт тієї самої вкладки — у тому порядку, що в журналі">Наступний: № ' + next + ' ›</button>' : '') + '</div><div class="go-note">' + NOTE.next + '</div>';
       h += '<div class="go-head"><h1 class="go-h1">Звіт № ' + r.number + '</h1>' + badge(r) + '</div><div class="go-note">' + NOTE.card + '</div>';
       if (r.state === 'returned' && !r.deleted) h += '<div class="go-remark"><b>Зауваження водієві:</b> ' + esc(r.remark) + '</div>';
       h += '<div class="go-cols"><div>';
-      if (f.length) h += '<div class="go-attn"><h2>Що перевірити</h2>' + f.map(function (x) { return '<p' + (x.kind ? ' class="' + x.kind + '"' : '') + '>' + x.icon + ' ' + x.text + '</p>'; }).join('') + '</div>';
+      if (f.length) h += '<div class="go-attn"><h2 title="Що система помітила в цьому звіті. Рішення — за вами">Що перевірити</h2>' + f.map(function (x) { return '<p' + (x.kind ? ' class="' + x.kind + '"' : '') + '>' + x.icon + ' ' + x.text + '</p>'; }).join('') + '</div>';
       h += '<div class="go-card"><h2>Рейс</h2>' + kv('Дата рейсу', fmtDate(r.date)) + kv('Водій', esc(r.driverName) + '<small><button type="button" class="go-link" data-act="fdriver">усі звіти водія</button></small>') +
         kv('Автомобіль', esc(r.vehicleName) + (r.trailerName ? '<small>причіп: ' + esc(r.trailerName) + '</small>' : '') +
           '<small><button type="button" class="go-link" data-act="fvehicle">усі звіти машини</button></small>') +
         kv('Маршрут', esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : '')) + kv('Замовник', esc(r.customerName)) +
         kv('Спідометр', nf(r.odoStart) + ' → ' + nf(r.odoEnd) + (r.odoPrev != null && r.odoPrev !== r.odoStart ? '<small>за попереднім звітом ' + nf(r.odoPrev) + '</small>' : '')) +
         kv('Пробіг', nf(r.mileage) + ' км') +
-        kv('Плановий пробіг', r.planned != null ? nf(r.planned) + ' км<small>за маршрутом, допуск ±' + nf(r.tolerance) + ' км</small>' : 'не задано<small>у маршруту немає плану — сигналу немає</small>') +
-        kv('Розрахункова витрата', fuelLines(r)) +
+        kv('Плановий пробіг', r.planned != null ? nf(r.planned) + ' км<small>за маршрутом, допуск ±' + nf(r.tolerance) + ' км</small>' : 'не задано<small>у маршруту немає плану — сигналу немає</small>',
+          'Погоджений пробіг рейсу туди й назад за маршрутом. Відхилення більше допуску — аларм: перепробіг чи недопробіг') +
+        kv('Розрахункова витрата', fuelLines(r), 'Пробіг × норма ÷ 100 — розрахунок, а не факт') +
         (r.comment ? kv('Коментар водія', esc(r.comment)) : '') + '</div>';
       h += '<div class="go-card"><h2>Заправки</h2>' + (r.refills.length ? r.refills.map(function (x, i) {
         return '<div class="go-refill"><div class="go-rtext"><b>' + nf(x.liters, 0, 2) + ' л ' + (x.target === 'reef' ? 'у реф' : 'у бак') + '</b>' +
@@ -976,7 +996,7 @@ var GipOfficeReport = {
       }).join('') : '<p class="go-empty" style="padding:0;text-align:left">Заправок не було.</p>') + '</div>';
       h += '</div><div>';
       h += '<div class="go-card go-acts"><h2>Дії</h2>' + (acts.length ? acts.map(function (x) {
-        return '<button type="button" class="go-btn ' + x[2] + '" data-act="' + x[0] + '">' + x[1] + '</button>';
+        return '<button type="button" class="go-btn ' + x[2] + '" data-act="' + x[0] + '" title="' + esc(ACT_HINT[x[0]] || '') + '">' + x[1] + '</button>';
       }).join('') : '<p class="go-empty" style="padding:0;text-align:left">У вашої ролі немає дій із цим звітом.</p>') +
         '<div class="go-note">' + NOTE.acts + '</div></div>';
       h += '<div class="go-card go-hist"><h2>Рух звіту</h2><p>Відправлено: ' + fmtDate(r.submittedAt) + (r.submittedAt !== r.created ? '<br><small>уперше — ' + fmtDate(r.created) + '</small>' : '') + '</p>' +
