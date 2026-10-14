@@ -53,6 +53,8 @@ textarea.gdr-in { min-height: 84px; resize: vertical; }
 
 .gdr-auto { background: var(--y-soft); border: 1.5px dashed var(--y-edge); border-radius: 10px; padding: 10px 12px; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; color: var(--text); }
 .gdr-auto .src { font-weight: 400; font-size: 13px; color: var(--muted); text-align: right; }
+.gdr-auto .ln { display: block; text-align: right; }
+.gdr-auto .ln small { font-weight: 400; font-size: 13px; color: var(--muted); }
 
 .gdr-seg { display: flex; gap: 8px; }
 .gdr-seg label { flex: 1; margin: 0; position: relative; }
@@ -211,16 +213,24 @@ function testData(today) {
     settings: { backdateDays: 1, historyDays: 30 },
     fuelTypes: [{ id: 'dt', name: 'Дизель' }, { id: 'a95', name: 'Бензин А-95' }, { id: 'gas', name: 'Газ' }],
     vehicles: [
-      // tank — объём бака, л: больше в бак залить нельзя. Не задан — проверки нет.
+      // fuel — табличная часть «Топливо» (ТЗ-011, п. 3.3): не больше двух строк, у одной стоит main — основное топливо.
+      // У каждого: fuelTypeId — вид, rate — норма, л на 100 км, tank — объём бака под это топливо, л: больше в бак залить нельзя.
+      // Норма и объём необязательны: вид топлива известен раньше, чем посчитана норма. Не задан объём — проверки нет.
+      // fuelSecondMode — как идёт второе топливо: 'instead' — вместо основного (бензин и газ: рейс идёт на одном из них),
+      // 'together' — вместе с основным (газодизель: на каждом километре горят оба).
       // kind — тип, один выбор при заведении машины: 'van' — бус, 'truck' — грузовик, 'tractor' — тягач (ездит с прицепом),
       // 'trailer' — прицеп. От типа зависят пиктограмма и поле «Причіп»; прицеп как машина рейса не предлагается.
       // reefTank — объём бака рефа, л. Реф может стоять на любой машине и на прицепе; у тягача своего рефа нет.
       // Задан объём — реф заправляется отдельно, и в заправке появляется выбор «куда залито».
-      { id: 'v1', name: 'АА 1001 ТС', kind: 'van', tank: 75, reefTank: 30, rates: [{ fuelTypeId: 'dt', rate: 9.8 }] },   // бус с рефом, есть прошлый отчёт
-      { id: 'v2', name: 'АА 1002 ТС', kind: 'van', tank: 93, rates: [{ fuelTypeId: 'dt', rate: 10.5 }] },  // новая машина, отчётов нет
-      { id: 'v3', name: 'АА 1003 ТС', kind: 'van', rates: [] },                                            // ни нормы, ни объёма бака
-      { id: 'v4', name: 'АА 1004 ТС', kind: 'truck', tank: 120, reefTank: 60, rates: [{ fuelTypeId: 'dt', rate: 17.5 }] },  // пятитонник с рефом
-      { id: 'v5', name: 'АА 2001 ТС', kind: 'tractor', tank: 800, rates: [{ fuelTypeId: 'dt', rate: 28.5 }] },
+      { id: 'v1', name: 'АА 1001 ТС', kind: 'van', reefTank: 30, fuel: [{ fuelTypeId: 'dt', main: true, rate: 9.8, tank: 75 }] },   // бус с рефом, есть прошлый отчёт
+      { id: 'v2', name: 'АА 1002 ТС', kind: 'van', fuel: [{ fuelTypeId: 'dt', main: true, rate: 10.5, tank: 93 }] },  // новая машина, отчётов нет
+      { id: 'v3', name: 'АА 1003 ТС', kind: 'van' },                                                       // топливо в справочнике не задано
+      { id: 'v4', name: 'АА 1004 ТС', kind: 'truck', reefTank: 60, fuel: [{ fuelTypeId: 'dt', main: true, rate: 17.5, tank: 120 }] },  // пятитонник с рефом
+      { id: 'v5', name: 'АА 2001 ТС', kind: 'tractor', fuel: [{ fuelTypeId: 'dt', main: true, rate: 28.5, tank: 800 }] },
+      { id: 'v6', name: 'АА 1005 ТС', kind: 'van', fuelSecondMode: 'instead',                              // бус на газу, бензин — вместо газа
+        fuel: [{ fuelTypeId: 'a95', main: false, rate: 11, tank: 70 }, { fuelTypeId: 'gas', main: true, rate: 13.2, tank: 60 }] },   // основное — не первая строка
+      { id: 'v7', name: 'АА 1006 ТС', kind: 'truck', fuelSecondMode: 'together',                           // газодизель: дизель и газ разом
+        fuel: [{ fuelTypeId: 'dt', main: true, rate: 10, tank: 200 }, { fuelTypeId: 'gas', main: false, rate: 13.5, tank: 120 }] },
       { id: 't1', name: 'АА 3001 ХР', kind: 'trailer', reefTank: 240 },                                        // прицеп с рефом
       { id: 't2', name: 'АА 3002 ХР', kind: 'trailer' }                                                        // прицеп без рефа
     ],
@@ -255,16 +265,37 @@ function testData(today) {
   d.reports = d.reports.map(function (r) { return mkReport(d, r); });
   return d;
 }
+// Топливо рейса: какие виды топлива машины считаются по норме. Одно топливо — оно; второе «вместо основного» —
+// основное либо второе, если водитель сказал, что рейс шёл на нём (alt); второе «вместе с основным» — оба.
+// Строки топлива машины: основное первым. Строка одна — она основная без отметки.
+function fuelsOf(v) {
+  var rows = (v && v.fuel) || [];
+  return rows.length < 2 ? rows.slice() : rows.filter(function (x) { return x.main; }).concat(rows.filter(function (x) { return !x.main; }));
+}
+function tripFuels(v, alt) {
+  var f = fuelsOf(v);
+  if (!f.length) return [];
+  if (f[1] && v.fuelSecondMode === 'together') return [f[0], f[1]];
+  return [(f[1] && v.fuelSecondMode === 'instead' && alt) ? f[1] : f[0]];
+}
+function consOf(mileage, rate) { return (mileage != null && rate) ? Math.round(mileage * rate / 10) / 10 : null; }
+// Норма и расчётный расход ложатся в отчёт по топливу: fuelTypeId/norm/cons — первое, fuel2TypeId/norm2/cons2 — второе, если горят оба.
+function putFuel(r, fuels) {
+  var a = fuels[0], b = fuels[1];
+  r.fuelTypeId = a ? a.fuelTypeId : ''; r.norm = a && a.rate ? a.rate : null; r.cons = consOf(r.mileage, r.norm);
+  r.fuel2TypeId = b ? b.fuelTypeId : ''; r.norm2 = b && b.rate ? b.rate : null; r.cons2 = b ? consOf(r.mileage, r.norm2) : null;
+}
 // Доводит тестовый отчёт до того вида, в каком отчёт создаёт форма: названия, пробег, норма, расчётный расход, итоги.
 function mkReport(d, r) {
-  var v = byId(d.vehicles, r.vehicleId), t = byId(d.vehicles, r.trailerId), rate = v.rates.length === 1 ? v.rates[0].rate : null;
+  var v = byId(d.vehicles, r.vehicleId), t = byId(d.vehicles, r.trailerId);
   r.vehicleName = v.name;
   r.trailerId = r.trailerId || (v.kind === 'tractor' ? 'none' : '');
   r.trailerName = t ? t.name : '';
   r.routeName = byId(d.routes, r.routeId).name;
   r.routeDesc = r.routeDesc || ''; r.comment = ''; r.departed = ''; r.arrived = '';
   r.odoPrev = r.odoPrev == null ? null : r.odoPrev;
-  r.mileage = r.odoEnd - r.odoStart; r.norm = rate; r.cons = rate ? Math.round(r.mileage * rate / 10) / 10 : null;
+  r.mileage = r.odoEnd - r.odoStart;
+  putFuel(r, tripFuels(v, r.altFuel));
   r.refills = r.refills || []; r.tank = 0; r.reef = 0; r.sum = 0;   // sum — оплачено не топливной картой
   r.refills.forEach(function (x) {
     if (x.target === 'reef') r.reef += x.liters; else r.tank += x.liters;
@@ -278,6 +309,8 @@ function mkReport(d, r) {
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function nf(n, min, max) { return Number(n).toLocaleString('uk-UA', { minimumFractionDigits: min, maximumFractionDigits: max }); }
 function fmtDate(iso) { return iso.split('-').reverse().join('.'); }
+// Название посреди строки — со строчной буквы, остальное как в справочнике: «бензин А-95», а не «бензин а-95».
+function low(s) { s = String(s == null ? '' : s); return s.charAt(0).toLowerCase() + s.slice(1); }
 function byId(list, id) { return list.filter(function (x) { return x.id === id; })[0] || null; }
 // В списке дата короткая, без года: там отчёты за последний месяц. Для сегодня и вчера рядом ещё и слово.
 function shortDay(iso, today) {
@@ -313,12 +346,17 @@ function reportDetails(r, data) {
     h += kv('Розбіжність на початок', (r.odoStart > r.odoPrev ? '+' : '−') + nf(Math.abs(r.odoStart - r.odoPrev), 0, 0) + ' км<small>за попереднім звітом ' + nf(r.odoPrev, 0, 0) + '</small>');
   }
   h += kv('Пробіг', nf(r.mileage, 0, 0) + ' км');
-  h += kv('Розрахункова витрата', r.cons != null ? nf(r.cons, 1, 1) + ' л' : 'немає норми');
+  // По каждому топливу рейса: расход, вид и норма. Горят оба (газодизель) — две строки.
+  h += kv('Розрахункова витрата', !r.fuelTypeId ? 'немає норми' : [[r.fuelTypeId, r.norm, r.cons]].concat(r.fuel2TypeId ? [[r.fuel2TypeId, r.norm2, r.cons2]] : [])
+    .map(function (x) {
+      var fuel = byId(data.fuelTypes, x[0]);
+      return (x[2] != null ? nf(x[2], 1, 1) + ' л' : 'немає норми') + '<small>' + (fuel ? esc(low(fuel.name)) : '') + (x[1] ? ', норма ' + nf(x[1], 1, 2) : '') + '</small>';
+    }).join(''));
   if (!r.refills.length) h += kv('Заправки', 'не було');
   r.refills.forEach(function (x, i) {
     var fuel = byId(data.fuelTypes, x.fuelTypeId);
     h += kv('Заправка ' + (i + 1), nf(x.liters, 0, 2) + ' л' + (x.target === 'reef' ? ' у реф' : ' у бак') + '<small>' +
-      [fuel ? esc(fuel.name).toLowerCase() : '', TYPE[x.type], x.target === 'reef' ? '' : 'спідометр ' + nf(x.odo, 0, 0), x.target === 'reef' ? '' : (x.full ? 'до повного' : 'не до повного'),
+      [fuel ? esc(low(fuel.name)) : '', TYPE[x.type], x.target === 'reef' ? '' : 'спідометр ' + nf(x.odo, 0, 0), x.target === 'reef' ? '' : (x.full ? 'до повного' : 'не до повного'),
         x.sum ? nf(x.sum, 2, 2) + ' грн' : '', x.hasPhoto ? 'є фото чека' : ''].filter(Boolean).join(' · ') + '</small>');
   });
   if (r.sum) h += kv('Оплачено не паливною карткою', nf(r.sum, 2, 2) + ' грн');
@@ -350,7 +388,7 @@ function reportDetails(r, data) {
 var H = {   // пояснения к полям — для собственника и разработчика, водитель их не видит
   date: 'Вводит водитель: выбор из списка разрешённых дней, набрать руками нельзя. По умолчанию сегодня. В списке — сегодня и столько дней назад, сколько задано настройкой.',
   pickRoute: 'Поиск по части названия. Маршруты, требующие описания, закреплены сверху и при поиске не пропадают.',
-  pickVehicle: 'У каждой строки пиктограмма и слово по типу машины из справочника: бус, грузовик, тягач; отдельно — «з рефом». Тип выбирают один раз, когда заводят машину. Сверху — до трёх последних машин этого водителя, по его отчётам. Это подсказка, а не подстановка: поле в форме остаётся пустым. Поиск по части номера, латинские и кириллические буквы не различаются. Выбывшие из парка машины не показываются.',
+  pickVehicle: 'У каждой строки пиктограмма и слово по типу машины из справочника: бус, грузовик, тягач; отдельно — «з рефом» и оба вида топлива, если их у машины два. Тип выбирают один раз, когда заводят машину. Сверху — до трёх последних машин этого водителя, по его отчётам. Это подсказка, а не подстановка: поле в форме остаётся пустым. Поиск по части номера, латинские и кириллические буквы не различаются. Выбывшие из парка машины не показываются.',
   vehicle: 'Вводит водитель. Поле пустое намеренно: последняя машина не подставляется, чтобы её не забывали сменить. Его последние машины стоят первыми в списке выбора.',
   route: 'Вводит водитель, из справочника маршрутов. Маршруты, требующие описания, стоят первыми, остальные — по алфавиту.',
   routeDesc: 'Появляется и обязательно, только если у маршрута стоит признак «требует описания».',
@@ -360,12 +398,13 @@ var H = {   // пояснения к полям — для собственни�
   odoStartManual: 'Предыдущего отчёта по машине нет — новая машина или старт системы. Показание вводит водитель.',
   odoEnd: 'Вводит водитель. Полное показание, не меньше начального.',
   mileage: 'Считает система: конец минус начало. Видно сразу при вводе.',
-  norm: 'Заполняет система из справочника машин. В отчёт копируется числом.',
-  cons: 'Считает система: пробег × норма ÷ 100. Это расчёт, а не факт.',
+  norm: 'Заполняет система из справочника машин: норма того топлива, на котором шёл рейс. В отчёт копируется числом. У газодизеля, где второе топливо горит вместе с основным, — обе нормы.',
+  cons: 'Считает система: пробег × норма ÷ 100, по каждому топливу рейса. Это расчёт, а не факт.',
+  tripFuel: 'Только у машины на двух видах топлива, где второе идёт вместо основного (бензин и газ). Система подставляет основное топливо из справочника машин. Шёл рейс на другом — водитель нажимает кнопку под полем, причину не пишет. Рейс пополам не делится: весь пробег считается по норме выбранного топлива. У газодизеля, где оба топлива горят вместе, этого поля нет.',
   refills: 'Заправок может быть ноль или несколько.',
   rType: 'Обязательно, без значения по умолчанию. Бочка — своё топливо, без оплаты. Топливная карта — та, что компания выдала водителю. Банковская карта и наличные — обычная оплата на АЗС; они разведены, чтобы потом можно было различить.',
   rTarget: 'Есть, только если реф стоит на машине или на выбранном прицепе (в справочнике машин задан объём бака рефа); иначе заправка всегда в бак. Обязательно, без значения по умолчанию. Реф — холодильная установка.',
-  rLiters: 'Обязательно. Число больше нуля, запятая или точка. Не больше объёма бака (или бака рефа) из справочника машин, если он там задан. Слева — вид топлива, отдельного поля у него нет: система берёт его из справочника машин; если у машины нет нормы или видов топлива несколько, там же его выбирает водитель.',
+  rLiters: 'Обязательно. Число больше нуля, запятая или точка. Не больше объёма бака под это топливо (или бака рефа) из справочника машин, если он там задан. Слева — вид топлива, отдельного поля у него нет. Топливо у машины одно — его подставляет система. Два — водитель выбирает из этих двух, без значения по умолчанию. В справочнике топливо не задано — выбор из всего справочника видов топлива.',
   rOdo: 'Только для заправки в бак. Обязательно, между показаниями на начало и на конец рейса — диапазон показан под полем. По этим показаниям позже считается расход от заправки до заправки.',
   rFull: 'Только для заправки в бак. Обязательно, без значения по умолчанию — забыть нельзя.',
   rSum: 'Только для банковской карты и наличных: там платит водитель, и чек — единственный источник суммы. Необязательно. У топливной карты поля нет: настоящую сумму, со скидкой по договору, даёт выписка топливной компании. У бочки оплаты нет.',
@@ -407,13 +446,15 @@ var GipDriverReport = {
       if (P.draft) loadDraft(P.draft);
     }
     function blank() {
-      return { date: today, vehicleId: P.vehicle || '', trailerId: '', routeId: '', routeDesc: '', odoStart: '', odoOverride: false, odoEnd: '', departed: '', arrived: '', comment: '' };
+      // altFuel — рейс шёл не на основном топливе, а на втором (только у машины, где второе топливо идёт вместо основного)
+      return { date: today, vehicleId: P.vehicle || '', trailerId: '', routeId: '', routeDesc: '', odoStart: '', odoOverride: false, odoEnd: '', altFuel: false,
+        departed: '', arrived: '', comment: '' };
     }
     // Исправление возвращённого отчёта: форма открывается заполненной тем, что водитель сдал.
     function loadReport(r) {
       var p;
       st.f = { date: r.date, vehicleId: r.vehicleId, trailerId: r.trailerId || '', routeId: r.routeId, routeDesc: r.routeDesc || '', odoStart: '', odoOverride: false,
-        odoEnd: grp(r.odoEnd), departed: r.departed || '', arrived: r.arrived || '', comment: r.comment || '' };
+        odoEnd: grp(r.odoEnd), altFuel: !!r.altFuel, departed: r.departed || '', arrived: r.arrived || '', comment: r.comment || '' };
       p = prevReport();
       if (!p || p.odoEnd !== r.odoStart) { st.f.odoStart = grp(r.odoStart); st.f.odoOverride = !!p; }
       st.refills = r.refills.map(function (x) {
@@ -477,9 +518,22 @@ var GipDriverReport = {
         .filter(function (r) { return r.vehicleId === v && !r.deleted && r.number !== self && (r.date + r.number) < key; })
         .sort(function (a, b) { return (a.date + a.number) < (b.date + b.number) ? 1 : -1; })[0] || null;
     }
-    // Норма: у машины ровно одна — берётся она; ни одной или несколько — пусто (правило уточняется в ТЗ).
-    function norm() { var v = vehicle(); return v && v.rates.length === 1 ? v.rates[0] : null; }
-    function needFuelChoice() { var v = vehicle(); return !!v && v.rates.length !== 1; }
+    // Второе топливо вместо основного (instead: бензин и газ) — водитель может сказать, что рейс шёл на втором.
+    function altVehicle() { var v = vehicle(); return fuelsOf(v).length === 2 && v.fuelSecondMode === 'instead'; }
+    // По каким видам топлива считается норма в этом рейсе.
+    function used() { return tripFuels(vehicle(), altVehicle() && st.f.altFuel); }
+    // Вид топлива в заправке подставляется, только если у машины оно одно. Два — выбор из них; не задано — из всего справочника.
+    function autoFuel() { var f = fuelsOf(vehicle()); return f.length === 1 ? f[0].fuelTypeId : ''; }
+    function needFuelChoice() { return !!vehicle() && !autoFuel(); }
+    function fuelOptions() {
+      var f = fuelsOf(vehicle());
+      return f.length ? f.map(function (x) { return { id: x.fuelTypeId, name: fuelName(x.fuelTypeId) }; }) : data.fuelTypes;
+    }
+    // Бак под топливо этой заправки: у каждого топлива машины свой.
+    function slotOf(r) {
+      var id = autoFuel() || r.fuelTypeId;
+      return fuelsOf(vehicle()).filter(function (x) { return x.fuelTypeId === id; })[0] || null;
+    }
     // Спидометр на начало: из предыдущего отчёта, пока водитель не сказал, что на спидометре другая цифра.
     function odoStart() { var p = prevReport(); return (p && !st.f.odoOverride) ? p.odoEnd : int(st.f.odoStart); }
     function gapText() {
@@ -502,18 +556,27 @@ var GipDriverReport = {
     // Заправка за деньги — всё, кроме бочки. own — оплата не топливной картой: банковская карта или наличные.
     function paid(r) { return r.type === 'card' || r.type === 'bank' || r.type === 'cash'; }
     function own(r) { return r.type === 'bank' || r.type === 'cash'; }
-    function limitOf(r) { var v = vehicle(), t = target(r); return !v ? 0 : (t === 'tank' ? v.tank : (t === 'reef' ? reefUnit().reefTank : 0)) || 0; }
-    function limitNote(r) { var l = limitOf(r); return l ? (target(r) === 'reef' ? 'Бак рефа — ' : 'Бак цієї машини — ') + nf(l, 0, 0) + ' л' : ''; }
+    function limitOf(r) {
+      var v = vehicle(), t = target(r), s = slotOf(r);
+      return !v ? 0 : (t === 'tank' ? (s && s.tank) : (t === 'reef' ? reefUnit().reefTank : 0)) || 0;
+    }
+    function limitNote(r) {
+      var l = limitOf(r);
+      if (!l) return '';
+      if (target(r) === 'reef') return 'Бак рефа — ' + nf(l, 0, 0) + ' л';
+      return (autoFuel() ? 'Бак цієї машини — ' : 'Бак для пального «' + esc(fuelName(slotOf(r).fuelTypeId)) + '» — ') + nf(l, 0, 0) + ' л';
+    }
 
     function calc() {
-      var s = odoStart(), e = int(st.f.odoEnd), n = norm(), tank = 0, reef = 0, sum = 0;
+      var s = odoStart(), e = int(st.f.odoEnd), tank = 0, reef = 0, sum = 0;
       var mileage = (!isNaN(s) && !isNaN(e) && e >= s) ? e - s : null;
       st.refills.forEach(function (r) {
         var l = dec(r.liters), m = dec(r.sum), t = target(r);
         if (!isNaN(l)) { if (t === 'tank') tank += l; else if (t === 'reef') reef += l; }
         if (own(r) && !isNaN(m)) sum += m;
       });
-      return { odoStart: s, mileage: mileage, cons: (mileage != null && n) ? Math.round(mileage * n.rate / 10) / 10 : null, tank: tank, reef: reef, sum: sum };
+      return { odoStart: s, mileage: mileage, tank: tank, reef: reef, sum: sum,
+        cons: used().map(function (x) { return { fuelTypeId: x.fuelTypeId, cons: consOf(mileage, x.rate) }; }) };
     }
 
     function validate() {
@@ -651,7 +714,10 @@ var GipDriverReport = {
         pinned: function (i) { return idx(i.id) < 99; },
         icon: function (i) { return i.fixed ? '' : unitIcon(i); },
         sub: function (i) {
-          return [KIND[i.kind] || '', i.reefTank ? 'з рефом' : '', idx(i.id) < 99 ? 'ваш рейс ' + fmtDate(rec[idx(i.id)].date) : ''].filter(Boolean).join(' · ');
+          return [KIND[i.kind] || '', i.reefTank ? 'з рефом' : '',
+            // два вида топлива: основное первым и жирным
+            fuelsOf(i).length === 2 ? '<b>' + esc(low(fuelName(fuelsOf(i)[0].fuelTypeId))) + '</b> + ' + esc(low(fuelName(fuelsOf(i)[1].fuelTypeId))) : '',
+            idx(i.id) < 99 ? 'ваш рейс ' + fmtDate(rec[idx(i.id)].date) : ''].filter(Boolean).join(' · ');
         },
         empty: tr ? 'Причіп не знайдено.' : 'Автомобіль не знайдено.' };
     }
@@ -711,19 +777,19 @@ var GipDriverReport = {
     }
 
     function refillView(r, i) {
-      var k = 'r' + r.id + '.', v = vehicle(), n = norm(), fuel;
+      var k = 'r' + r.id + '.', v = vehicle(), af = autoFuel(), fuel;
       var h = '<div class="gdr-refill"><div class="gdr-refill-h"><span>Заправка ' + (i + 1) + '</span>' +
         '<button type="button" class="gdr-link" data-act="del" data-id="' + r.id + '">Видалити</button></div>';
       h += fld(k + 'type', 'Спосіб заправки', seg(k + 'type', [['barrel', 'З бочки', 'наше пальне, без оплати'], ['card', 'Паливна картка', 'картка, яку видала компанія'],
         ['bank', 'Банківська картка'], ['cash', 'Готівка']], r.type, true), { req: 1, hint: H.rType });
       if (hasReef()) h += fld(k + 'target', 'Куди залито', seg(k + 'target', [['tank', 'У бак'], ['reef', 'У реф']], r.target), { req: 1, hint: H.rTarget });
       // Порядок после способа заправки: литры, «до полного», спидометр.
-      // Вид топлива стоит слева от литров, своего поля у него нет: система берёт его из машины, а если не может — там же выбор.
-      // Пока машина не выбрана, слева пусто.
-      fuel = !v ? '' : (n ? '<div class="gdr-auto gdr-fuel">' + esc(fuelName(n.fuelTypeId)) + '</div>'
-        : '<div class="gdr-fuel">' + sel(k + 'fuelTypeId', data.fuelTypes, r.fuelTypeId, '— вид —') + '</div>');
+      // Вид топлива стоит слева от литров, своего поля у него нет: топливо у машины одно — система берёт его оттуда;
+      // два — там же выбор из этих двух; не задано — выбор из всего справочника. Пока машина не выбрана, слева пусто.
+      fuel = !v ? '' : (af ? '<div class="gdr-auto gdr-fuel">' + esc(fuelName(af)) + '</div>'
+        : '<div class="gdr-fuel">' + sel(k + 'fuelTypeId', fuelOptions(), r.fuelTypeId, '— вид —') + '</div>');
       h += fld(k + 'liters', 'Літри', '<div class="gdr-2 gdr-lit">' + fuel + inp(k + 'liters', { mode: 'decimal', value: r.liters, ph: 'Наприклад, 45,5' }) + '</div>',
-        { req: 1, forId: 'f-' + k + 'liters', hint: H.rLiters, note: limitNote(r), after: (v && !n) ? '<div class="gdr-err" data-err="' + k + 'fuelTypeId"></div>' : '' });
+        { req: 1, forId: 'f-' + k + 'liters', hint: H.rLiters, note: limitNote(r), after: (v && !af) ? '<div class="gdr-err" data-err="' + k + 'fuelTypeId"></div>' : '' });
       if (target(r) === 'tank') {
         h += fld(k + 'full', 'Залито до повного бака?', seg(k + 'full', [['yes', 'Так'], ['no', 'Ні']], r.full), { req: 1, hint: H.rFull });
         h += fld(k + 'odo', 'Спідометр під час заправки, км', inp(k + 'odo', { mode: 'numeric', value: r.odo }), { req: 1, forId: 'f-' + k + 'odo', hint: H.rOdo, note: rangeText(), noteOut: 'range' });
@@ -752,7 +818,7 @@ var GipDriverReport = {
       document.body.style.overflow = (st.sheet || st.ask || st.fail) ? 'hidden' : '';   // под открытым списком или окном форма не прокручивается
       if (st.done) { el.classList.remove('barred'); el.innerHTML = head() + doneView(); return; }
 
-      var f = st.f, v = vehicle(), p = prevReport(), rt = route(), n = norm();
+      var f = st.f, v = vehicle(), p = prevReport(), rt = route(), u = used();
       var h = head();
       // Исправление: замечание офиса закреплено под шапкой, чтобы оно было перед глазами, пока водитель правит.
       if (P.report && P.report.remark) {
@@ -784,8 +850,14 @@ var GipDriverReport = {
       else h += fld('odoStart', 'Спідометр на початок рейсу, км', inp('odoStart', { mode: 'numeric', value: f.odoStart, ph: 'Попереднього звіту немає' }), { req: 1, forId: 'f-odoStart', hint: H.odoStartManual });
       h += fld('odoEnd', 'Спідометр на кінець рейсу, км', inp('odoEnd', { mode: 'numeric', value: f.odoEnd, ph: 'Повний показник' }), { req: 1, forId: 'f-odoEnd', hint: H.odoEnd });
       h += fld('mileage', 'Пробіг, км', auto('mileage', '—', '', true), { hint: H.mileage });
-      h += fld('norm', 'Норма витрати, л на 100 км', auto('', n ? nf(n.rate, 1, 2) : (v ? 'не задано' : '—'),
-        n ? esc(fuelName(n.fuelTypeId)) + ' · з довідника машин' : (v ? 'з довідника машин' : ''), true), { hint: H.norm });
+      // Пальне в рейсі — только у машины, где второе топливо идёт вместо основного (instead). Подставлено основное;
+      // водитель меняет его кнопкой, как спидометр на начало, и так же может вернуть.
+      if (altVehicle()) {
+        h += fld('altFuel', 'Пальне в рейсі', auto('', esc(fuelName(u[0].fuelTypeId)), f.altFuel ? 'замість основного' : 'основне пальне'),
+          { hint: H.tripFuel, after: '<button type="button" class="gdr-alt" data-act="altfuel">' +
+            (f.altFuel ? 'Повернути основне: ' + esc(fuelName(fuelsOf(v)[0].fuelTypeId)) : 'Інше пальне: ' + esc(fuelName(fuelsOf(v)[1].fuelTypeId))) + '</button>' });
+      }
+      h += fld('norm', 'Норма витрати, л на 100 км', normBox(v, u), { hint: H.norm });
       h += fld('cons', 'Розрахункова витрата, л', auto('cons', '—', '', true), { hint: H.cons });
       h += '</div>';
 
@@ -808,13 +880,29 @@ var GipDriverReport = {
       refresh();
     }
 
+    // Два топлива рейса (газодизель) — по строке на каждое: число и вид.
+    function lines(list) {
+      return list.map(function (x) { return '<span class="ln">' + x[0] + ' <small>' + esc(low(fuelName(x[1]))) + '</small></span>'; }).join('');
+    }
+    function normBox(v, u) {
+      if (!v) return auto('', '—', '', true);
+      if (!u.length) return auto('', 'не задано', 'з довідника машин', true);
+      if (u.length === 1) return auto('', u[0].rate ? nf(u[0].rate, 1, 2) : 'не задано', esc(fuelName(u[0].fuelTypeId)) + ' · з довідника машин', true);
+      return auto('', lines(u.map(function (x) { return [x.rate ? nf(x.rate, 1, 2) : 'не задано', x.fuelTypeId]; })), 'обидва види разом · з довідника машин', true);
+    }
+    function consText(c) {
+      if (!vehicle() || c.mileage == null) return '—';
+      if (!c.cons.length) return 'немає норми';
+      if (c.cons.length === 1) return c.cons[0].cons != null ? nf(c.cons[0].cons, 1, 1) : 'немає норми';
+      return lines(c.cons.map(function (x) { return [x.cons != null ? nf(x.cons, 1, 1) : 'немає норми', x.fuelTypeId]; }));
+    }
     function setOut(name, html) { var n = el.querySelector('[data-out="' + name + '"]'); if (n) n.innerHTML = html; return n; }
 
     function refresh() {
       if (st.done) return;
       var c = calc(), t;
       setOut('mileage', c.mileage != null ? nf(c.mileage, 0, 0) : '—');
-      setOut('cons', c.cons != null ? nf(c.cons, 1, 1) : (vehicle() && !norm() && c.mileage != null ? 'немає норми' : '—'));
+      setOut('cons', consText(c));
       t = setOut('totals', 'Разом за рейс: у бак — <b>' + nf(c.tank, 0, 2) + ' л</b>' +
         (c.reef ? ', у реф — <b>' + nf(c.reef, 0, 2) + ' л</b>' : '') + (c.sum ? ', оплачено не паливною карткою — <b>' + nf(c.sum, 2, 2) + ' грн</b>' : ''));
       setOut('gap', gapText());
@@ -882,7 +970,7 @@ var GipDriverReport = {
     // Смена машины, типа и места заправки меняет состав полей: лишнее очищается, чтобы не уехало в отчёт.
     function structural(k) {
       var m = /^r(\d+)\.(type|target)$/.exec(k), r;
-      if (k === 'vehicleId') { st.f.odoStart = ''; st.f.odoOverride = false; st.f.trailerId = ''; st.refills.forEach(function (x) { x.fuelTypeId = ''; x.target = ''; }); }
+      if (k === 'vehicleId') { st.f.odoStart = ''; st.f.odoOverride = false; st.f.altFuel = false; st.f.trailerId = ''; st.refills.forEach(function (x) { x.fuelTypeId = ''; x.target = ''; }); }
       if (k === 'trailerId') st.refills.forEach(function (x) { x.target = ''; });   // с другим прицепом реф мог появиться или пропасть
       if (k === 'routeId' && !(route() && route().descRequired)) st.f.routeDesc = '';
       if (m) {
@@ -934,7 +1022,7 @@ var GipDriverReport = {
         render();
         return;
       }
-      c = calc(); v = vehicle(); n = norm(); p = prevReport();
+      c = calc(); v = vehicle(); n = autoFuel(); p = prevReport();
       num = data.reports.reduce(function (m, r) { return Math.max(m, Number(r.number)); }, 0) + 1;
       report = {
         number: P.report ? P.report.number : String(num).padStart(6, '0'), state: 'submitted', mine: true, date: st.f.date,
@@ -942,16 +1030,17 @@ var GipDriverReport = {
         trailerId: v.kind === 'tractor' ? st.f.trailerId : '', trailerName: (v.kind === 'tractor' && trailer()) ? trailer().name : '',
         routeId: st.f.routeId, routeName: route().name, routeDesc: st.f.routeDesc.trim(),
         odoStart: c.odoStart, odoPrev: p ? p.odoEnd : null,   // хранятся обе цифры: фактическая и из предыдущего отчёта
-        odoEnd: int(st.f.odoEnd), mileage: c.mileage, norm: n ? n.rate : null, cons: c.cons,
+        odoEnd: int(st.f.odoEnd), mileage: c.mileage, altFuel: altVehicle() && st.f.altFuel,
         departed: st.f.departed, arrived: st.f.arrived, comment: st.f.comment.trim(),
         refills: st.refills.map(function (r) {
           var t = target(r);
-          return { type: r.type, target: t, liters: dec(r.liters), fuelTypeId: n ? n.fuelTypeId : r.fuelTypeId,
+          return { type: r.type, target: t, liters: dec(r.liters), fuelTypeId: n || r.fuelTypeId,
             odo: t === 'tank' ? int(r.odo) : null, full: t === 'tank' ? r.full === 'yes' : null,
             sum: (own(r) && r.sum !== '') ? dec(r.sum) : null, hasPhoto: !!r.photo };
         }),
         tank: c.tank, reef: c.reef, sum: c.sum
       };
+      putFuel(report, used());   // норма копируется в отчёт числом — по каждому топливу рейса
       // Новый отчёт встаёт в общий ряд и становится предыдущим для своей машины. Исправленный — тот же отчёт с тем же
       // номером: он возвращается в «Відправлений», а последнее замечание офиса система помнит (ТЗ-007, п. 3.5).
       if (P.report) st.done = Object.assign(P.report, report); else { data.reports.push(report); st.done = report; }
@@ -964,13 +1053,14 @@ var GipDriverReport = {
 
     function act(name, id) {
       var k;
-      if (name === 'ovr' || name === 'choose' || name === 'add' || name === 'del' || name === 'delphoto') st.dirty = true;
+      if (name === 'ovr' || name === 'altfuel' || name === 'choose' || name === 'add' || name === 'del' || name === 'delphoto') st.dirty = true;
       if (name === 'hints') { st.hints = !st.hints; if (typeof P.onHints === 'function') P.onHints(st.hints); render(); }
       else if (name === 'back') { document.body.style.overflow = ''; if (typeof P.onExit === 'function') P.onExit(); }
       else if (name === 'remark') { st.remarkOpen = !st.remarkOpen; render(); }
       else if (name === 'pick') { st.sheet = { key: id, q: '' }; render(); }
       else if (name === 'close') { st.sheet = null; render(); }
       else if (name === 'ovr') { st.f.odoOverride = !st.f.odoOverride; st.f.odoStart = ''; render(); }
+      else if (name === 'altfuel') { st.f.altFuel = !st.f.altFuel; render(); }
       else if (name === 'choose') { k = st.sheet.key; setVal(k, id); structural(k); st.sheet = null; render(); }
       else if (name === 'add') { st.refills.push({ id: ++uid, type: '', target: '', liters: '', fuelTypeId: '', odo: '', full: '', sum: '', photo: null }); render(); }
       else if (name === 'del') { st.refills = st.refills.filter(function (r) { return r.id !== Number(id); }); render(); }
