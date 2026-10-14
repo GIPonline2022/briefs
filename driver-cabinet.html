@@ -341,7 +341,7 @@ function reportDetails(r, data) {
   var h = kv('Дата рейсу', fmtDate(r.date)) + kv('Автомобіль', esc(r.vehicleName));
   if (r.trailerId) h += kv('Причіп', r.trailerId === 'none' ? 'без причепа' : esc(r.trailerName));
   h += kv('Маршрут', esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : ''));
-  h += kv('Спідометр', nf(r.odoStart, 0, 0) + ' → ' + nf(r.odoEnd, 0, 0));
+  h += kv('Спідометр', nf(r.odoStart, 0, 0) + ' → ' + nf(r.odoEnd, 0, 0) + (r.hasOdoPhoto ? '<small>є фото спідометра на кінець</small>' : ''));
   if (r.odoPrev != null && r.odoPrev !== r.odoStart) {
     h += kv('Розбіжність на початок', (r.odoStart > r.odoPrev ? '+' : '−') + nf(Math.abs(r.odoStart - r.odoPrev), 0, 0) + ' км<small>за попереднім звітом ' + nf(r.odoPrev, 0, 0) + '</small>');
   }
@@ -397,6 +397,7 @@ var H = {   // пояснения к полям — для собственни�
   pickTrailer: 'Сверху — «Без причепа» и до трёх последних прицепов этого водителя. Поиск по части номера. В списке «Автомобіль» прицепов нет.',
   odoStartManual: 'Предыдущего отчёта по машине нет — новая машина или старт системы. Показание вводит водитель.',
   odoEnd: 'Вводит водитель. Полное показание, не меньше начального.',
+  odoPhoto: 'Необязательно (собственник, 2026-10-14). Снимок спидометра на конец рейса — камерой прямо из формы или из галереи, как фото чека (п. 3.6). Офис видит его в карточке отчёта. Цифры с фото система не распознаёт — это отложено.',
   mileage: 'Считает система: конец минус начало. Видно сразу при вводе.',
   norm: 'Заполняет система из справочника машин: норма того топлива, на котором шёл рейс. В отчёт копируется числом. У газодизеля, где второе топливо горит вместе с основным, — обе нормы.',
   cons: 'Считает система: пробег × норма ÷ 100, по каждому топливу рейса. Это расчёт, а не факт.',
@@ -447,14 +448,14 @@ var GipDriverReport = {
     }
     function blank() {
       // altFuel — рейс шёл не на основном топливе, а на втором (только у машины, где второе топливо идёт вместо основного)
-      return { date: today, vehicleId: P.vehicle || '', trailerId: '', routeId: '', routeDesc: '', odoStart: '', odoOverride: false, odoEnd: '', altFuel: false,
+      return { date: today, vehicleId: P.vehicle || '', trailerId: '', routeId: '', routeDesc: '', odoStart: '', odoOverride: false, odoEnd: '', odoPhoto: null, altFuel: false,
         departed: '', arrived: '', comment: '' };
     }
     // Исправление возвращённого отчёта: форма открывается заполненной тем, что водитель сдал.
     function loadReport(r) {
       var p;
       st.f = { date: r.date, vehicleId: r.vehicleId, trailerId: r.trailerId || '', routeId: r.routeId, routeDesc: r.routeDesc || '', odoStart: '', odoOverride: false,
-        odoEnd: grp(r.odoEnd), altFuel: !!r.altFuel, departed: r.departed || '', arrived: r.arrived || '', comment: r.comment || '' };
+        odoEnd: grp(r.odoEnd), odoPhoto: r.hasOdoPhoto ? 'kept' : null, altFuel: !!r.altFuel, departed: r.departed || '', arrived: r.arrived || '', comment: r.comment || '' };
       p = prevReport();
       if (!p || p.odoEnd !== r.odoStart) { st.f.odoStart = grp(r.odoStart); st.f.odoOverride = !!p; }
       st.refills = r.refills.map(function (x) {
@@ -766,6 +767,7 @@ var GipDriverReport = {
 
     // Фото чека. «Сфотографувати» сразу открывает заднюю камеру телефона (capture), «З галереї» — готовые снимки.
     // Камера системная, через выбор файла: ей не нужны разрешения страницы, и она работает в файле, открытом из мессенджера.
+    // То же самое — для фото спидометра на конец рейса: r = { id: 'odo', photo: st.f.odoPhoto }.
     function photoView(r) {
       var shot = function (text, capture) {
         return '<label class="gdr-btn gdr-shot">' + text + '<input type="file" accept="image/*"' + (capture ? ' capture="environment"' : '') + ' data-photo="' + r.id + '"></label>';
@@ -849,6 +851,8 @@ var GipDriverReport = {
           after: '<div class="gdr-lim" data-out="gap"></div><button type="button" class="gdr-alt" data-act="ovr">Повернути показник із попереднього звіту</button>' });
       else h += fld('odoStart', 'Спідометр на початок рейсу, км', inp('odoStart', { mode: 'numeric', value: f.odoStart, ph: 'Попереднього звіту немає' }), { req: 1, forId: 'f-odoStart', hint: H.odoStartManual });
       h += fld('odoEnd', 'Спідометр на кінець рейсу, км', inp('odoEnd', { mode: 'numeric', value: f.odoEnd, ph: 'Повний показник' }), { req: 1, forId: 'f-odoEnd', hint: H.odoEnd });
+      // Фото спидометра на конец рейса — необязательно (собственник, 2026-10-14). Камера — как у фото чека.
+      h += fld('odoPhoto', 'Фото спідометра на кінець рейсу', photoView({ id: 'odo', photo: f.odoPhoto }), { hint: H.odoPhoto });
       h += fld('mileage', 'Пробіг, км', auto('mileage', '—', '', true), { hint: H.mileage });
       // Пальне в рейсі — только у машины, где второе топливо идёт вместо основного (instead). Подставлено основное;
       // водитель меняет его кнопкой, как спидометр на начало, и так же может вернуть.
@@ -1030,7 +1034,7 @@ var GipDriverReport = {
         trailerId: v.kind === 'tractor' ? st.f.trailerId : '', trailerName: (v.kind === 'tractor' && trailer()) ? trailer().name : '',
         routeId: st.f.routeId, routeName: route().name, routeDesc: st.f.routeDesc.trim(),
         odoStart: c.odoStart, odoPrev: p ? p.odoEnd : null,   // хранятся обе цифры: фактическая и из предыдущего отчёта
-        odoEnd: int(st.f.odoEnd), mileage: c.mileage, altFuel: altVehicle() && st.f.altFuel,
+        odoEnd: int(st.f.odoEnd), hasOdoPhoto: !!st.f.odoPhoto, mileage: c.mileage, altFuel: altVehicle() && st.f.altFuel,
         departed: st.f.departed, arrived: st.f.arrived, comment: st.f.comment.trim(),
         refills: st.refills.map(function (r) {
           var t = target(r);
@@ -1070,6 +1074,7 @@ var GipDriverReport = {
       else if (name === 'unfail') { st.fail = false; render(); }
       else if (name === 'showerr') showErr(true);
       else if (name === 'new') { st.tried = false; st.done = null; st.dirty = false; st.touched = {}; st.shown = {}; st.f = blank(); st.refills = []; render(); window.scrollTo(0, 0); }
+      else if (name === 'delphoto' && id === 'odo') { st.f.odoPhoto = null; render(); }
       else if (name === 'delphoto') { k = refillById(id); if (k) k.photo = null; render(); }
     }
 
@@ -1098,6 +1103,11 @@ var GipDriverReport = {
     });
     el.addEventListener('change', function (ev) {
       var t = ev.target, k = t.getAttribute('data-f'), r, file;
+      if (t.getAttribute('data-photo') === 'odo') {
+        file = t.files && t.files[0];
+        if (file) { try { st.f.odoPhoto = URL.createObjectURL(file); } catch (x) { st.f.odoPhoto = null; } st.dirty = true; render(); }
+        return;
+      }
       if (t.getAttribute('data-photo')) {
         r = refillById(t.getAttribute('data-photo')); file = t.files && t.files[0];
         if (r && file) { try { r.photo = URL.createObjectURL(file); } catch (x) { r.photo = null; } st.dirty = true; render(); }
@@ -1182,7 +1192,7 @@ var GipDriverCabinet = {
     try { drafts = JSON.parse(window.localStorage.getItem('gip-dr-drafts') || '{}') || {}; } catch (x) { drafts = {}; }
     function setDraft(key, s) {
       if (s) drafts[key] = s; else delete drafts[key];
-      try { window.localStorage.setItem('gip-dr-drafts', JSON.stringify(drafts, function (k, v) { return k === 'photo' ? null : v; })); } catch (x) { /* хранилища нет — живёт до перезагрузки */ }
+      try { window.localStorage.setItem('gip-dr-drafts', JSON.stringify(drafts, function (k, v) { return (k === 'photo' || k === 'odoPhoto') ? null : v; })); } catch (x) { /* хранилища нет — живёт до перезагрузки */ }
     }
     function byNum(n) { return data.reports.filter(function (r) { return r.number === n; })[0] || null; }
     // Каждый экран получает новый контейнер: обработчики прежнего экрана уходят вместе с ним.
