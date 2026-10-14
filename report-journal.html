@@ -85,6 +85,12 @@ button, input, select, textarea { font: inherit; color: var(--text); }
 .go-in:focus, .go-period:focus, .go-btn:focus, .go-tab:focus { outline: 3px solid var(--y); outline-offset: 1px; }
 .go-in.bad { border-color: var(--err); background: var(--err-bg); }
 .go-pop { position: absolute; top: 46px; left: 0; z-index: 15; width: 360px; max-width: calc(100vw - 32px); padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); box-shadow: 0 8px 24px rgba(0, 0, 0, .15); }
+.go-colpop ol { margin: 8px 0; padding-left: 22px; }
+.go-colpop li { display: flex; align-items: center; gap: 6px; min-height: 38px; }
+.go-colpop li span { flex: 1; }
+.go-colpop li small { color: var(--muted); }
+.go-colpop li .go-btn { min-height: 34px; min-width: 38px; padding: 2px 8px; }
+.go-table tr.go-sub td.sub { padding-left: 42px; }
 .go-pop label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 40px; margin: 0 0 6px; cursor: pointer; }
 .go-pop input[type=number] { width: 72px; }
 .go-pop .go-row { display: flex; gap: 8px; margin-top: 10px; }
@@ -496,7 +502,7 @@ var NOTE = {   // пояснения — для собственника и ра
   filters: '<b>Фильтры</b> — водитель, машина или прицеп, маршрут, кто подтвердил, кто вернул, состояние отчёта и общее состояние документа (ТЗ-005; общее — во всех журналах документов, ТЗ-014, п. 3.9). Строка фильтров свёрнута под кнопку «Фільтри», чтобы не занимать место; включённые фильтры видны и так — их число на кнопке, она выделена, рядом «Скинути фільтри». Работают вместе и внутри периода, действуют на все вкладки и счётчики. В списке значений — только то, что есть в отчётах периода: так фильтр не открывает справочник пользователей, на который у диспетчера нет права (ТЗ-014, п. 3.4). Не запоминаются: из карточки обратно — на месте, из меню — сброшены. «Хто підтвердив» и «Хто повернув» ищут по последнему такому событию: система помнит только его (ТЗ-007, п. 3.5). Попробуйте: «Водій» — «Тестенко О. П.».',
   miss: '<b>Без звіту</b> — не документы, а пары «машина × день»: действующие машины, кроме прицепов, без отчёта за дни, за которые отчёт ещё можно сдать (сейчас — вчера; глубина — настройка report_backdate_days, ТЗ-007, п. 3.11). Сегодня не считается: день не закончился. Старые пропуски не показываются: сдать их уже нельзя, а без плана рейсов это почти всегда стоявшие машины. Период действует и здесь: если вчера не входит в период, вкладка пуста и говорит об этом. Фильтры шапки действуют, как на всех вкладках: у строки есть машина и водитель последнего отчёта (кому звонить), поэтому фильтр по маршруту или по тому, кто подтвердил или вернул, оставляет вкладку пустой. Свой фильтр вкладки — «Показати машини»: что ездили за 2 дня или за неделю до дня без отчёта, или все; по умолчанию — за неделю. Он отсекает стоявшие машины: что ездило недавно, скорее всего, ездит и сейчас (предложение PO). Цена: машина, впервые вышедшая после долгого простоя, и новая машина без отчётов видны только при «усі». Когда появится план рейсов, здесь будут запланированные рейсы без отчёта — за любой период и со всеми фильтрами.',
   tabs: '<b>Вкладки — по следующему шагу.</b> «Перевірити» — отправленные, старые сверху, в последней колонке — сколько ждёт. «У водія» — возвращённые. «Перенести в таблицю» — подтверждённые, но не проведённые. «Проведені» — перенесённые в таблицу бухгалтерии. «Усі» — всё, включая помеченные на удаление: в рабочих вкладках их нет, с ними ничего не делают. Первой открывается вкладка, где у сотрудника есть работа: диспетчеру — «Перевірити», бухгалтеру — «Перенести в таблицю».',
-  sort: '<b>Сортировка</b> — нажатие на заголовок колонки: по возрастанию, ещё раз — по убыванию, третий раз — обычный порядок вкладки (ТЗ-014, п. 3.8). Обычный порядок задаёт ТЗ вида: «Перевірити» — кто дольше ждёт, выше; «Без звіту» — вчера сверху, машины по алфавиту; остальные — свежие сверху. Пустые значения всегда внизу. Не запоминается, как фильтры: другая вкладка или журнал из меню — обычный порядок, из карточки обратно — на месте. «Позначки» не сортируются: в строке их может быть несколько.',
+  sort: '<b>Сортировка</b> — нажатие на заголовок колонки: по возрастанию, ещё раз — по убыванию, третий раз — обычный порядок вкладки (ТЗ-014, п. 3.8). Обычный порядок задаёт ТЗ вида: «Перевірити» — кто дольше ждёт, выше; «Без звіту» — вчера сверху, машины по алфавиту; остальные — свежие сверху. Пустые значения всегда внизу. Не запоминается, как фильтры: другая вкладка или журнал из меню — обычный порядок, из карточки обратно — на месте. «Позначки» не сортируются: в строке их может быть несколько. <b>Порядок колонок</b> по умолчанию — состояние документа, дата, номер, дальше колонки вида; это общее правило журналов документов (ТЗ-014, п. 3.10). Кнопка «Стовпці» меняет порядок любых колонок, включая первые три; он запоминается в браузере у каждого пользователя, как период; «Звичайний порядок» возвращает исходный. Галочки выделения — служебная колонка, всегда слева.',
   flags: '<b>Первая колонка</b> — состояние документа, общее для всех журналов, как в 1С: ☐ записан, ☑ проведён, ☒ помечен на удаление (ТЗ-014, п. 3.9). Рабочее состояние отчёта — отправлен, на исправлении, подтверждён — отдельной колонкой «Стан» (ТЗ-007). Фильтруются оба. <b>Позначки</b> — второй строкой под отчётом, а не колонкой: так таблица уже (PO, 2026-10-14). Что стоит проверить, всегда значком и словом. Первыми — аларм: пробег отличается от планового по маршруту больше допуска, перепробег красным, недопробег синим (собственник, 2026-10-14; ТЗ-003, п. 3.2); ровно на допуск и у маршрута без плана — без аларма. Дальше: водитель заменил спидометр на начало (ТЗ-004, п. 3.4); разрыв с предыдущим отчётом по машине — тот исправили уже после этого; оплата не топливной картой (п. 3.6); рейс не на основном топливе (п. 3.7); нет нормы.',
   select: '<b>Отметки строк</b> есть на вкладках «Перенести в таблицю» — скопировать для таблицы и провести разом — и «Проведені» — скопировать ещё раз. На других вкладках действий над несколькими отчётами нет — и отметок нет (ТЗ-014, п. 3.5). Подтверждать разом нельзя: каждый отчёт проверяют глазами. Каждый отчёт проводится отдельно, итог показывает, что не проведено и почему.',
   copy: '<b>Скопіювати для таблиці</b> — только подтверждённые отчёты, у сотрудника с правом проводить: в таблицу бухгалтерии уходит только проверенное (собственник, встреча 07.08). Не проведённые — на вкладке «Перенести в таблицю»: копирование — первая половина переноса, «Провести» — вторая. Проведённые — на вкладке «Проведені» и в карточке, если строка в таблице потерялась; перед копированием — предупреждение о дублях (решение PO 2026-10-14). Строки уходят в буфер обмена, по строке на отчёт, колонки через табуляцию — вставляются в Google-таблицу как есть. Порядок колонок наш, пока нет заголовка таблицы бухгалтерии (ORG-061), — тогда выставим под него. Колонки: номер, дата, водитель, машина, прицеп, маршрут, описание маршрута, заказчик, спидометр на начало и конец, пробег, топливо рейса, норма, расчётный расход, второе топливо, его норма и расход, литры — бочка, АЗС, реф из бочки, реф с АЗС, сумма по чекам, комментарий; две последние — отклонение пробега от плана, км, и его статус «перепробіг» или «недопробіг»: заполняются, только если пробег вышел за допуск (собственник, 2026-10-14). Числа с запятой. Вставлять в пустые строки: колонки с формулами затрутся. У машины на двух видах топлива литры разных видов пока складываются в одну колонку.',
@@ -570,6 +576,7 @@ var HELP = [
     '<li>Пошук за номером шукає в межах періоду, без урахування вкладок і фільтрів. Нулі попереду можна не вводити: «126» знайде 000126.</li>' +
     '<li>Натисніть на назву стовпця — список упорядкується за ним; ще раз — у зворотному порядку; утретє — повернеться звичайний порядок вкладки. '
     + 'Порожні значення завжди внизу. Сортування не запам’ятовується: інша вкладка чи журнал, відкритий із меню, — знову звичайний порядок.</li>' +
+    '<li>Порядок стовпців змінює кнопка «Стовпці». Він запам’ятовується в цьому браузері, як період. «Звичайний порядок» повертає стандартний: стан документа, дата, номер і далі.</li>' +
     '<li>Вкладка «Без звіту» теж у межах періоду: якщо вчора не входить у період, пропусків там не видно. Для щоденної перевірки зручно «Останні N днів».</li></ul>'],
   ['Як перенести звіти в таблицю бухгалтерії', '<ol><li>Відкрийте вкладку «Перенести в таблицю» й позначте звіти.</li>' +
     '<li>Натисніть «Скопіювати для таблиці» та вставте рядки в таблицю — у порожні рядки.</li>' +
@@ -581,17 +588,27 @@ var HELP = [
 // Колонки журнала и по чему каждая сортируется (ТЗ-014, п. 3.8). «Позначки» не сортируются: их в строке может быть несколько.
 // Состояние — по ходу жизни отчёта: отправлен, на исправлении, подтверждён, проведён; помеченные на удаление — в конце.
 var STATE_ORDER = { submitted: 1, returned: 2, approved: 3 };
+// Порядок по умолчанию — у любого журнала документов: состояние документа, дата, номер; дальше колонки вида (ТЗ-014, п. 3.10).
+// name — как колонка называется в панели «Стовпці»; cell — ячейка строки отчёта.
 var COLS = [
-  { id: 'doc', title: '☐', cls: 'doc', hint: 'Стан документа: ☐ записаний, ☑ проведений, ☒ позначений на видалення', key: function (r) { return docState(r); } },
-  { id: 'number', title: '№', key: function (r) { return r.number; } },
-  { id: 'date', title: 'Дата рейсу', key: function (r) { return r.date + r.number; } },
-  { id: 'driver', title: 'Водій', text: 1, key: function (r) { return r.driverName; } },
-  { id: 'vehicle', title: 'Автомобіль', text: 1, key: function (r) { return r.vehicleName; } },
-  { id: 'route', title: 'Маршрут', text: 1, key: function (r) { return r.routeName; } },
-  { id: 'mileage', title: 'Пробіг, км', hint: 'Спідометр на кінець мінус на початок', num: 1, key: function (r) { return r.mileage; } },
-  { id: 'liters', title: 'Заправки, л', hint: 'Літри всіх заправок рейсу — і в бак, і в реф', num: 1, key: function (r) { return r.refills.length ? r.refills.reduce(function (s, x) { return s + x.liters; }, 0) : null; } },
-  { id: 'state', title: 'Стан', hint: 'Стан звіту: відправлений, на виправленні чи підтверджений. Наведіть на значок — побачите пояснення', key: function (r) { return STATE_ORDER[r.state]; } }
+  { id: 'doc', name: 'Стан документа', title: '☐', cls: 'doc', hint: 'Стан документа: ☐ записаний, ☑ проведений, ☒ позначений на видалення', key: function (r) { return docState(r); },
+    cell: function (r) { return '<td class="doc">' + docIcon(r) + '</td>'; } },
+  { id: 'date', name: 'Дата рейсу', title: 'Дата рейсу', key: function (r) { return r.date + r.number; }, cell: function (r) { return '<td>' + fmtDate(r.date) + '</td>'; } },
+  { id: 'number', name: 'Номер', title: '№', key: function (r) { return r.number; }, cell: function (r) { return '<td>' + r.number + '</td>'; } },
+  { id: 'driver', name: 'Водій', title: 'Водій', text: 1, key: function (r) { return r.driverName; }, cell: function (r) { return '<td>' + esc(r.driverName) + '</td>'; } },
+  { id: 'vehicle', name: 'Автомобіль', title: 'Автомобіль', text: 1, key: function (r) { return r.vehicleName; },
+    cell: function (r) { return '<td>' + esc(r.vehicleName) + (r.trailerName ? '<small>' + esc(r.trailerName) + '</small>' : '') + '</td>'; } },
+  { id: 'route', name: 'Маршрут', title: 'Маршрут', text: 1, key: function (r) { return r.routeName; },
+    cell: function (r) { return '<td>' + esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : '') + '</td>'; } },
+  { id: 'mileage', name: 'Пробіг', title: 'Пробіг, км', hint: 'Спідометр на кінець мінус на початок', num: 1, key: function (r) { return r.mileage; },
+    cell: function (r) { return '<td class="num">' + nf(r.mileage) + '</td>'; } },
+  { id: 'liters', name: 'Заправки', title: 'Заправки, л', hint: 'Літри всіх заправок рейсу — і в бак, і в реф', num: 1,
+    key: function (r) { return r.refills.length ? r.refills.reduce(function (s, x) { return s + x.liters; }, 0) : null; },
+    cell: function (r) { return '<td class="num">' + (r.refills.length ? nf(r.refills.reduce(function (s, x) { return s + x.liters; }, 0), 0, 2) : '—') + '</td>'; } },
+  { id: 'state', name: 'Стан звіту', title: 'Стан', hint: 'Стан звіту: відправлений, на виправленні чи підтверджений. Наведіть на значок — побачите пояснення',
+    key: function (r) { return STATE_ORDER[r.state]; }, cell: function (r) { return '<td>' + stateBadge(r) + '</td>'; } }
 ];
+var COL_DEFAULT = ['doc', 'date', 'number', 'driver', 'vehicle', 'route', 'mileage', 'liters', 'state', 'wait'];
 // Колонки вкладки «Без звіту»: срок сдачи — дата плюс постоянная глубина, поэтому сортируется по дате.
 var MCOLS = [
   { id: 'mdate', title: 'Дата рейсу', key: function (x) { return x.date; } },
@@ -619,7 +636,38 @@ var GipReportJournal = {
     // act — свой фильтр вкладки «Без звіту»: машины, что ездили за 2 дня ('2'), за неделю ('7') до дня без отчёта, или все ('all')
     var st = Object.assign({ tab: firstTab(), q: '', sel: {}, act: '7' }, P.state || {});
     st.f = Object.assign(noFilters(), st.f || {});
-    var period = loadPeriod(), pop = null, help = false;
+    var period = loadPeriod(), pop = null, help = false, cpop = false, colKey = 'gip-office:cols:' + P.user + ':doc.driver_report', order = loadOrder();
+    // Порядок колонок — у каждого пользователя свой, в браузере, как период (ТЗ-014, пп. 3.6, 3.10). Неизвестные колонки — в конец.
+    function loadOrder() {
+      var o = null;
+      try { o = JSON.parse(window.localStorage.getItem(colKey) || 'null'); } catch (x) { /* хранилища нет */ }
+      if (!Array.isArray(o)) return COL_DEFAULT.slice();
+      o = o.filter(function (id) { return COL_DEFAULT.indexOf(id) >= 0; });
+      return o.concat(COL_DEFAULT.filter(function (id) { return o.indexOf(id) < 0; }));
+    }
+    function saveOrder() { try { window.localStorage.setItem(colKey, JSON.stringify(order)); } catch (x) { /* живёт до перезагрузки */ } }
+    function isDefaultOrder() { return order.join() === COL_DEFAULT.join(); }
+    function waitCol() {
+      return { id: 'wait', name: 'Чекає / Повернуто', title: st.tab === 'check' ? 'Чекає' : 'Повернуто', num: 1,
+        hint: st.tab === 'check' ? 'Скільки днів звіт чекає перевірки' : 'Скільки днів тому звіт повернули водієві',
+        key: function (r) { return days(st.tab === 'check' ? r.submittedAt : (r.returnedAt || r.date), today); },
+        cell: function (r) { return '<td class="num">' + waitText(st.tab === 'check' ? r.submittedAt : (r.returnedAt || r.date)) + '</td>'; } };
+    }
+    function colHtml() {
+      return '<div class="go-pop go-colpop" data-cpop="1"><b>Порядок стовпців</b><ol>' + order.map(function (id, i) {
+        var c = id === 'wait' ? waitCol() : COLS.filter(function (x) { return x.id === id; })[0];
+        return '<li><span>' + c.name + (id === 'wait' ? ' <small>на вкладках «Перевірити» й «У водія»</small>' : '') + '</span>' +
+          '<button type="button" class="go-btn" data-act="colup" data-id="' + id + '" title="Вище — лівіше в таблиці"' + (i ? '' : ' disabled') + '>↑</button>' +
+          '<button type="button" class="go-btn" data-act="coldown" data-id="' + id + '" title="Нижче — правіше в таблиці"' + (i < order.length - 1 ? '' : ' disabled') + '>↓</button></li>';
+      }).join('') + '</ol><div class="go-row">' +
+        (isDefaultOrder() ? '' : '<button type="button" class="go-link" data-act="colreset" title="Стан документа, дата, номер і далі як було спочатку">Звичайний порядок</button>') +
+        '<button type="button" class="go-btn primary" data-act="cclose">Готово</button></div></div>';
+    }
+    function moveCol(id, d) {
+      var i = order.indexOf(id), j = i + d;
+      if (i < 0 || j < 0 || j >= order.length) return;
+      order[i] = order[j]; order[j] = id; saveOrder();
+    }
 
     // Первая вкладка — где у сотрудника есть работа (ТЗ-014, п. 3.2: какая первая, задаёт ТЗ вида).
     function firstTab() { return (rights.approve || rights.send_back) ? 'check' : (rights.post ? 'transfer' : 'all'); }
@@ -664,12 +712,12 @@ var GipReportJournal = {
       return '<th class="' + (cls || '') + (on ? ' sorted' : '') + '" aria-sort="' + (on ? (st.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' +
         '<button type="button" class="go-sort" data-act="sort" data-id="' + c.id + '" title="' + esc((c.hint ? c.hint + '. ' : '') + 'Натисніть, щоб сортувати') + '">' + c.title + (on ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
     }
-    // Колонка «Чекає» / «Повернуто» — только на вкладках, где важно, сколько отчёт ждёт.
+    // Колонки в порядке пользователя. «Чекає» / «Повернуто» — только на вкладках, где важно, сколько отчёт ждёт.
     function docCols() {
-      if (wanted() || (st.tab !== 'check' && st.tab !== 'driver')) return COLS;
-      return COLS.concat([{ id: 'wait', title: st.tab === 'check' ? 'Чекає' : 'Повернуто', num: 1,
-        hint: st.tab === 'check' ? 'Скільки днів звіт чекає перевірки' : 'Скільки днів тому звіт повернули водієві',
-        key: function (r) { return days(st.tab === 'check' ? r.submittedAt : (r.returnedAt || r.date), today); } }]);
+      var withWait = !wanted() && (st.tab === 'check' || st.tab === 'driver');
+      return order.filter(function (id) { return id !== 'wait' || withWait; }).map(function (id) {
+        return id === 'wait' ? waitCol() : COLS.filter(function (x) { return x.id === id; })[0];
+      });
     }
     function rows() {
       var w = wanted(), tab = TABS.filter(function (t) { return t.id === st.tab; })[0];
@@ -761,22 +809,14 @@ var GipReportJournal = {
 
     function waitText(from) { var n = days(from, today); return n <= 0 ? 'сьогодні' : n + ' ' + plural(n, 'день', 'дні', 'днів'); }
     function rowHtml(r) {
-      var f = flagsOf(r, data), extra = '';
-      if (st.tab === 'check' && !wanted()) extra = '<td class="num">' + waitText(r.submittedAt) + '</td>';
-      if (st.tab === 'driver' && !wanted()) extra = '<td class="num">' + waitText(r.returnedAt || r.date) + '</td>';
+      var f = flagsOf(r, data), cols = docCols();
       // Пометки — второй строкой под отчётом, а не колонкой: так таблица уже, а слова у пометок остаются (PO, 2026-10-14).
-      var lead = (canBatch() ? 1 : 0) + 1;   // состояние документа и галочка — пометки начинаются под номером
+      // Галочка выделения — служебная колонка: всегда у левого края, в порядок колонок не входит (ТЗ-014, п. 3.10).
       return '<tbody class="go-rep' + (st.sel[r.number] ? ' sel' : '') + (r.deleted ? ' del' : '') + '" data-act="open" data-id="' + r.number + '">' +
         '<tr' + (f.length ? ' class="has-sub"' : '') + '>' +
-        '<td class="doc">' + docIcon(r) + '</td>' +
         (canBatch() ? '<td class="chk"><input type="checkbox" data-sel="' + r.number + '"' + (st.sel[r.number] ? ' checked' : '') + ' aria-label="Вибрати звіт ' + r.number + '" title="Позначити звіт, щоб скопіювати' + (st.tab === 'transfer' ? ' або провести' : ' ще раз') + '"></td>' : '') +
-        '<td>' + r.number + '</td><td>' + fmtDate(r.date) + '</td><td>' + esc(r.driverName) + '</td>' +
-        '<td>' + esc(r.vehicleName) + (r.trailerName ? '<small>' + esc(r.trailerName) + '</small>' : '') + '</td>' +
-        '<td>' + esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : '') + '</td>' +
-        '<td class="num">' + nf(r.mileage) + '</td>' +
-        '<td class="num">' + (r.refills.length ? nf(r.refills.reduce(function (s, x) { return s + x.liters; }, 0), 0, 2) : '—') + '</td>' +
-        '<td>' + stateBadge(r) + '</td>' + extra + '</tr>' +
-        (f.length ? '<tr class="go-sub">' + new Array(lead + 1).join('<td></td>') + '<td colspan="' + (docCols().length + (canBatch() ? 1 : 0) - lead) + '">' +
+        cols.map(function (c) { return c.cell(r); }).join('') + '</tr>' +
+        (f.length ? '<tr class="go-sub">' + (canBatch() ? '<td></td>' : '') + '<td class="sub" colspan="' + cols.length + '">' +
           f.map(function (x) { return '<span class="go-flag' + (x.kind ? ' ' + x.kind : '') + '" title="' + esc(plain(x.text)) + '">' + x.icon + ' ' + x.short + '</span>'; }).join('') +
           '</td></tr>' : '') + '</tbody>';
     }
@@ -792,7 +832,8 @@ var GipReportJournal = {
         (w ? '' : '<button type="button" class="go-fbtn' + (filtered() ? ' on' : '') + '" data-act="ftoggle" aria-expanded="' + !!st.fopen + '" title="Фільтри працюють разом, у межах періоду й на всіх вкладках; не запам’ятовуються">Фільтри' +
           (filtered() ? ': ' + nFilters() : '') + ' ' + (st.fopen ? '▴' : '▾') + '</button>' +
           (filtered() ? '<button type="button" class="go-link" data-act="freset" title="Прибрати всі фільтри">Скинути фільтри</button>' : '')) +
-        (pop ? popHtml() : '') + '</div>';
+        (w ? '' : '<button type="button" class="go-fbtn' + (isDefaultOrder() ? '' : ' on') + '" data-act="cols" title="Порядок стовпців: запам’ятовується в цьому браузері, як період">Стовпці ▾</button>') +
+        (pop ? popHtml() : '') + (cpop ? colHtml() : '') + '</div>';
       h += '<div class="go-note">' + NOTE.period + '</div><div class="go-note">' + NOTE.search + '</div>';
       if (!w && st.fopen) h += filtersHtml();
       if (!w) h += '<div class="go-note">' + NOTE.filters + '</div>';
@@ -808,9 +849,9 @@ var GipReportJournal = {
         if (st.tab === 'missing') h += '<div class="go-note">' + NOTE.miss + '</div>';
       }
       if (!w && st.tab === 'missing') h += missingTable(); else
-      h += '<div class="go-wrap"><table class="go-table"><thead><tr>' + th(COLS[0], 'doc') +
+      h += '<div class="go-wrap"><table class="go-table"><thead><tr>' +
         (canBatch() ? '<th class="chk"><input type="checkbox" data-selall="1" aria-label="Вибрати всі" title="Позначити всі звіти на вкладці"' + (list.length && nsel === list.length ? ' checked' : '') + '></th>' : '') +
-        docCols().slice(1).map(function (c) { return th(c, c.num ? 'num' : ''); }).join('') + '</tr></thead>' +
+        docCols().map(function (c) { return th(c, c.cls || (c.num ? 'num' : '')); }).join('') + '</tr></thead>' +
         (list.length ? list.map(rowHtml).join('') : '<tbody><tr><td colspan="11" class="go-empty">' + (w ? 'Нічого не знайдено.' : (filtered() ? 'За цей період із такими фільтрами нічого немає.' : 'За цей період тут нічого немає.')) + '</td></tr></tbody>') + '</table></div>';
       h += '<div class="go-note">' + NOTE.sort + '</div><div class="go-note">' + NOTE.flags + '</div><div class="go-note">' + NOTE.select + '</div><div class="go-note">' + NOTE.copy + '</div>';
       if (nsel && canBatch()) {
@@ -884,6 +925,11 @@ var GipReportJournal = {
       if (t.getAttribute('data-selall')) { st.sel = {}; if (t.checked) rows().forEach(function (r) { st.sel[r.number] = 1; }); render(); return; }
       if (t.closest('.chk')) return;   // промах мимо галочки не открывает отчёт
       if (pop && !t.closest('[data-pop]') && a !== 'period') { pop = null; render(); return; }
+      if (cpop && !t.closest('[data-cpop]') && a !== 'cols') { cpop = false; render(); return; }
+      if (a === 'cols') { cpop = !cpop; pop = null; render(); return; }
+      if (a === 'colup' || a === 'coldown') { moveCol(id, a === 'colup' ? -1 : 1); render(); return; }
+      if (a === 'colreset') { order = COL_DEFAULT.slice(); saveOrder(); render(); return; }
+      if (a === 'cclose') { cpop = false; render(); return; }
       if (a === 'open') { list = el._list; P.onOpen(id, list, { tab: st.tab, q: st.q, sel: st.sel, f: st.f, fopen: st.fopen, sort: st.sort, act: st.act }); }
       else if (a === 'actf') { st.act = id; render(); }
       else if (a === 'sort') {
