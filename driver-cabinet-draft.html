@@ -221,7 +221,8 @@ function testData(today) {
   var d = {
     driver: { name: 'Прототипов В. С.', email: 'prototypov@example.com' },   // выдуманный водитель: по фамилии видно, что это макет
     // backdateDays — на сколько дней назад можно сдать отчёт; historyDays — за сколько дней водитель видит свои отчёты
-    settings: { backdateDays: 1, historyDays: 30 },
+    // tripMaxDays — самый длинный рейс, дней: параметр установки (PO, 2026-10-21), от него — сколько дней в списке даты начала
+    settings: { backdateDays: 1, historyDays: 30, tripMaxDays: 31 },
     fuelTypes: [{ id: 'dt', name: 'Дизель' }, { id: 'a95', name: 'Бензин А-95' }, { id: 'gas', name: 'Газ' }],
     vehicles: [
       // fuel — табличная часть «Топливо» (ТЗ-011, п. 3.3): не больше двух строк, у одной стоит main — основное топливо.
@@ -338,6 +339,8 @@ function timeOf(dt) { var m = /T(\d{2}:\d{2})/.exec(dt || ''); return m ? m[1] :
 function minutesOf(date, time) { var a = date.split('-').map(Number), t = time.split(':').map(Number); return Math.round(new Date(a[0], a[1] - 1, a[2], t[0], t[1]).getTime() / 60000); }
 // Сутки — с формой числа: 1 доба, 2 доби, 5 діб, 21 доба.
 function dayWord(n) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? 'доба' : ((a >= 2 && a <= 4 && (b < 12 || b > 14)) ? 'доби' : 'діб'); }
+// Дни — тоже с формой числа: 1 день, 2 дні, 10 днів, 31 день.
+function daysWord(n) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? 'день' : ((a >= 2 && a <= 4 && (b < 12 || b > 14)) ? 'дні' : 'днів'); }
 // Длительность рейса: «2 доби 11 год 40 хв». Нулевые части не пишутся; ровно ноль — «0 хв».
 function durText(min) {
   var d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60, out = [];
@@ -419,8 +422,8 @@ function reportDetails(r, data) {
    Возвращает { state, update(params) }. */
 
 var H = {   // пояснения к полям — для собственника и разработчика, водитель их не видит
-  date: 'Дата начала рейса — это дата документа: по ней месяц рейса и колонка «Дата/ходка» в таблицах бухгалтерии. Вводит водитель: выбор из списка, набрать руками нельзя. По умолчанию сегодня. В списке — сегодня и назад на глубину настройки и ещё 30 дней: глубина считается по дате конца, а рейс бывает до 31 дня. Подпись дня — сначала дата, потом слово: «Сьогодні», «Вчора», «Позавчора», дальше день недели; дата впереди, чтобы даты стояли колонкой (PO, 2026-10-21).',
-  depTime: 'Время выезда — обязательно (собственник, 2026-10-21: часы нужны). Дату водитель отдельно не вводит: это дата начала рейса. Четыре цифры на цифровой клавиатуре: «0730» становится «07:30». Без значения по умолчанию.',
+  date: 'Дата начала рейса — это дата документа: по ней месяц рейса и колонка «Дата/ходка» в таблицах бухгалтерии. Вводит водитель: выбор из списка, набрать руками нельзя. По умолчанию сегодня. В списке — сегодня и назад на глубину настройки плюс длина самого длинного рейса без одного дня: глубина считается по дате конца. Длина самого длинного рейса — параметр установки «Найдовший рейс, днів» (PO, 2026-10-21), стартовое значение 31: поставите 10 — в списке будет 11 дней. Подпись дня — сначала дата, потом слово: «Сьогодні», «Вчора», «Позавчора», дальше день недели; дата впереди, чтобы даты стояли колонкой (PO, 2026-10-21).',
+  depTime: 'Время выезда — обязательно (собственник, 2026-10-21: часы нужны). Дату водитель отдельно не вводит: это дата начала рейса. Цифры на цифровой клавиатуре, двоеточие встаёт само: «0730» становится «07:30». Невозможную цифру набрать нельзя: после «2» в часах — только 0–3, десятки минут — только 0–5; первая цифра 3–9 — это 03–09, «7» сразу становится «07:». Набрать заново можно поверх: при входе в поле время выделено, первая цифра начинает новое. Так же — у времени прибытия и везде, где в системе вводят время, в том числе в офисе (PO, 2026-10-21). Без значения по умолчанию.',
   endDate: 'Дата конца рейса (собственник, 2026-10-21). Обязательно, без значения по умолчанию: водитель выбирает сам, как машину, — подставленная дата начала незаметно превращала бы многодневный рейс в однодневный. В списке — дни от даты начала до сегодня, но не глубже настройки и не дальше 31 дня от начала. Дату начала сдвинули позже — дата конца очищается. В журнале офиса многодневный рейс закрывает все свои дни на вкладке «Без звіту».',
   arrTime: 'Время прибытия — обязательно. Дата — это дата конца рейса. «Зараз» одним нажатием ставит дату конца — сегодня и время — текущее; само оно не подставляется: водитель, который сдаёт отчёт на следующий день, кнопку не нажмёт, и подставленное «сейчас» не ошибётся за него. У однодневного рейса прибытие не раньше выезда; в будущем — нельзя. От прибытия офис считает пометку «пізно»: отчёт отправлен позже порога после прибытия (ТЗ-005, п. 3.3).',
   blocks: '<b>Форма — по ходу рейса</b> (PO, 2026-10-21): «Початок рейсу» — при выезде, «Заправки» — прямо на заправке, «Кінець рейсу» — по прибытии. Незаконченный отчёт хранится на телефоне, его можно закрыть и продолжить. Пустой «Кінець рейсу» посреди рейса ошибкой не подсвечивается.',
@@ -479,6 +482,7 @@ var GipDriverReport = {
       P = Object.assign({}, p);
       today = /^\d{4}-\d{2}-\d{2}$/.test(P.today || '') ? P.today : isoDate(new Date());
       data = P.data || testData(today);
+      if (P.tripMaxDays > 0) data.settings.tripMaxDays = P.tripMaxDays;
       // editing — поле, в котором сейчас набирают; touched — поля, которые уже заполняли; shown — ошибки на экране
       // dirty — водитель что-то изменил: с этого момента введённое отдаётся наружу как незаконченный отчёт
       st = { hints: !!P.hints, tried: false, done: null, sheet: null, editing: null, touched: {}, shown: {}, dirty: false, remarkOpen: false, f: blank(), refills: [] };
@@ -526,14 +530,31 @@ var GipDriverReport = {
 
     /* ---------- разбор и показ чисел ---------- */
     function int(s) { var t = String(s).replace(/\s/g, ''); return /^\d+$/.test(t) ? Number(t) : NaN; }
-    // Время «ГГ:ХХ»: водитель набирает четыре цифры, двоеточие встаёт само — «0730» становится «07:30».
-    function timeInput(t) {
-      var d = t.value.replace(/\D/g, '').slice(0, 4), out = d.length > 2 ? d.slice(0, 2) + ':' + d.slice(2) : d;
-      if (out !== t.value) t.value = out;
+    // Время «ГГ:ХХ» — набор цифрами, двоеточие встаёт само: «0730» → «07:30».
+    // Невозможную цифру набрать нельзя — она просто не появляется: после 2 часов — только 0–3, десятки минут — только 0–5.
+    // Первая цифра часа 3–9 — это 03–09: «7» сразу становится «07:», дальше минуты.
+    // Время уже набрано полностью, а водитель набирает снова — это новое время: старое стирать не нужно.
+    // При входе в поле всё время выделено, поэтому первая же цифра его заменяет (PO, 2026-10-21).
+    function timeInput(t, ev) {
+      var prev = t.getAttribute('data-prev') || '', typed = ((ev && ev.data) || '').replace(/\D/g, ''),
+        del = !!(ev && ev.inputType && ev.inputType.indexOf('delete') === 0), raw = t.value.replace(/\D/g, ''), out = '', shown, i, c;
+      if (!del && /^\d{2}:\d{2}$/.test(prev) && raw.length > 4) raw = typed || raw.slice(4);
+      for (i = 0; i < raw.length && out.length < 4; i++) {
+        c = raw.charAt(i);
+        if (out.length === 0) out = c > '2' ? '0' + c : c;
+        else if (out.length === 1) { if (!(out === '2' && c > '3')) out += c; }
+        else if (out.length === 2) { if (c <= '5') out += c; }
+        else out += c;
+      }
+      // Двоеточие после часов — сразу, чтобы было видно, что дальше минуты; при стирании оно уходит вместе с минутами.
+      shown = (out.length > 2 || (out.length === 2 && !del)) ? out.slice(0, 2) + ':' + out.slice(2) : out;
+      t.value = shown;
+      t.setAttribute('data-prev', shown);
+      try { t.setSelectionRange(shown.length, shown.length); } catch (x) { /* поле без выделения */ }
     }
     function timeOk(s) { var m = /^(\d{2}):(\d{2})$/.exec(s || ''); return !!m && Number(m[1]) < 24 && Number(m[2]) < 60; }
     // Цифр меньше четырёх — подсказать, как набирать; четыре, но час или минута вне границ — сказать, что не так.
-    function timeMsg(s, example) { return /^\d{2}:\d{2}$/.test(s) ? 'Години — від 00 до 23, хвилини — від 00 до 59' : 'Чотири цифри, наприклад ' + example; }
+    function timeMsg(s, example) { return /^\d{2}:\d{2}$/.test(s) ? 'Години — від 00 до 23, хвилини — від 00 до 59' : 'Допишіть хвилини — наприклад, ' + example; }
     function nowTime() { var n = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return p(n.getHours()) + ':' + p(n.getMinutes()); }
     function dec(s) { var t = String(s).replace(/\s/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN; }
     // Разделитель тысяч в полях ввода: «184250» на глазах становится «184 250». Курсор остаётся на своей цифре.
@@ -667,7 +688,7 @@ var GipDriverReport = {
       else if (f.endDate < f.date) e.endDate = 'Раніше за дату початку рейсу';
       else if (f.endDate > today) e.endDate = 'Дата кінця рейсу не може бути в майбутньому';
       else if (f.endDate < minEnd() && !(P.report && f.endDate === P.report.endDate)) e.endDate = 'Рейс, що закінчився раніше ніж ' + fmtDate(minEnd()) + ', здати вже не можна';
-      else if (f.date && f.endDate > shift(f.date, 30)) e.endDate = 'Рейс не може тривати довше 31 дня';
+      else if (f.date && f.endDate > maxEndFor(f.date)) e.endDate = 'Рейс не може тривати довше ніж ' + data.settings.tripMaxDays + ' ' + daysWord(data.settings.tripMaxDays);
       // Время прибытия — обязательно; у однодневного рейса не раньше выезда; сегодня — не позже, чем сейчас.
       if (f.arrTime === '') e.arrTime = REQ;
       else if (!timeOk(f.arrTime)) e.arrTime = timeMsg(f.arrTime, '1910');
@@ -824,8 +845,10 @@ var GipDriverReport = {
       var a = d.split('-').map(Number);
       return shortDate(d) + ' · ' + (d === today ? 'Сьогодні' : d === shift(today, -1) ? 'Вчора' : d === shift(today, -2) ? 'Позавчора' : WEEKDAY[new Date(a[0], a[1] - 1, a[2]).getDay()]);
     }
-    // Самая ранняя дата начала: глубина считается по дате конца, а рейс длится до 31 дня (ТЗ-004, п. 3.3.1).
-    function minStart() { return shift(today, -(data.settings.backdateDays + 30)); }
+    // Самая ранняя дата начала: глубина считается по дате конца, а рейс длится не дольше параметра «Найдовший рейс» (ТЗ-004, п. 3.3.1).
+    function minStart() { return shift(today, -(data.settings.backdateDays + data.settings.tripMaxDays - 1)); }
+    // Последний день рейса, начатого в этот день: рейс не дольше параметра, день начала и день конца считаются.
+    function maxEndFor(start) { return shift(start, data.settings.tripMaxDays - 1); }
     // Самая ранняя дата конца — на глубину настройки.
     function minEnd() { return shift(today, -data.settings.backdateDays); }
     function dateSel() {
@@ -837,10 +860,10 @@ var GipDriverReport = {
         return '<option value="' + x + '"' + (x === st.f.date ? ' selected' : '') + '>' + dateText(x) + '</option>';
       }).join('') + '</select>';
     }
-    // Дата конца рейса — тем же списком: от даты начала до сегодня, но не глубже настройки и не дальше 31 дня от начала,
+    // Дата конца рейса — тем же списком: от даты начала до сегодня, но не глубже настройки и не дальше самого длинного рейса,
     // свежие сверху. По умолчанию пусто — водитель выбирает сам.
     function endDateSel() {
-      var list = [], d, last = st.f.date ? shift(st.f.date, 30) : today;
+      var list = [], d, last = st.f.date ? maxEndFor(st.f.date) : today;
       for (d = today; st.f.date && d >= st.f.date && d >= minEnd(); d = shift(d, -1)) if (d <= last) list.push(d);
       if (P.report && P.report.endDate && list.indexOf(P.report.endDate) < 0 && P.report.endDate >= st.f.date) list.push(P.report.endDate);
       return '<select class="gdr-in" id="f-endDate" data-f="endDate"><option value="">— оберіть дату —</option>' + list.map(function (x) {
@@ -848,8 +871,8 @@ var GipDriverReport = {
       }).join('') + '</select>';
     }
     function timeInp(key) {
-      return '<input class="gdr-in tm" id="f-' + key + '" data-f="' + key + '" type="text" inputmode="numeric" maxlength="5" placeholder="ГГ:ХХ" value="' + esc(st.f[key]) +
-        '" enterkeyhint="done" autocomplete="off">';
+      return '<input class="gdr-in tm" id="f-' + key + '" data-f="' + key + '" type="text" inputmode="numeric" placeholder="ГГ:ХХ" value="' + esc(st.f[key]) +
+        '" data-prev="' + esc(st.f[key]) + '" enterkeyhint="done" autocomplete="off">';
     }
     // Дата и время — одной строкой: день из списка и рядом время.
     function dateTime(dateKey, dateLabel, dateCtl, dateHint, timeKey, timeLabel, timeHint) {
@@ -1201,12 +1224,17 @@ var GipDriverReport = {
       var t = ev.target, k = t.getAttribute('data-f');
       if (t.getAttribute('data-q') && st.sheet) { st.sheet.q = t.value; setOut('picklist', pickList()); return; }   // поиск: обновляем только список
       if (!k || t.type === 'radio' || t.tagName === 'SELECT') return;
-      if (t.classList.contains('tm')) timeInput(t);   // время: четыре цифры, двоеточие встаёт само
+      if (t.classList.contains('tm')) timeInput(t, ev);   // время: недопустимые цифры не набираются, набор поверх — новое время
       else if (t.classList.contains('num')) groupInput(t, t.getAttribute('inputmode') === 'decimal', ev);
       setVal(k, t.value);
       st.editing = k;
       st.dirty = true;
       refresh();
+    });
+    // Время: при входе в поле оно выделено целиком — первая цифра начинает новое время, стирать старое не нужно.
+    el.addEventListener('focusin', function (ev) {
+      var t = ev.target;
+      if (t.classList && t.classList.contains('tm') && t.value) setTimeout(function () { try { t.setSelectionRange(0, t.value.length); } catch (x) { /* поле без выделения */ } }, 0);
     });
     // Ввод закончен: поле покинули. Теперь его можно проверять.
     el.addEventListener('focusout', function (ev) {
@@ -1312,6 +1340,7 @@ var GipDriverCabinet = {
     var P = Object.assign({}, params);
     var today = /^\d{4}-\d{2}-\d{2}$/.test(P.today || '') ? P.today : isoDate(new Date());
     var data = P.data || testData(today), hints = !!P.hints, drafts = {};
+    if (P.tripMaxDays > 0) data.settings.tripMaxDays = P.tripMaxDays;   // ?trip=10 — показать, как список дат зависит от параметра
 
     // Незаконченные отчёты живут на телефоне: в памяти страницы и, если браузер позволяет, в его хранилище —
     // тогда они переживают перезагрузку. Фото в хранилище не кладётся.
@@ -1426,13 +1455,15 @@ var GipDriverCabinet = {
      ?screen=fix&report=000122    сразу исправление возвращённого отчёта
      ?screen=view&report=000124   сразу просмотр отчёта
      ?offline=1                   показать отправку без связи: первая попытка не проходит, повторная проходит
+     ?trip=10                     параметр «Найдовший рейс» — 10 дней вместо стартовых 31: список дат начала короче
      ?embed=1                     одна форма без шапки и без кабинета — для вставки в другой дизайн */
 
 window.GipDriverReport = GipDriverReport;
 window.GipReportView = GipReportView;
 window.GipDriverCabinet = GipDriverCabinet;
 var q = new URLSearchParams(window.location.search), app = document.getElementById('app');
-var common = { hints: q.get('hints') === '1', today: q.get('today') || '', vehicle: q.get('vehicle') || '', offline: q.get('offline') === '1' };
+var common = { hints: q.get('hints') === '1', today: q.get('today') || '', vehicle: q.get('vehicle') || '', offline: q.get('offline') === '1',
+  tripMaxDays: parseInt(q.get('trip') || '', 10) || 0 };
 if (q.get('embed') === '1') GipDriverReport.mount(app, Object.assign({ embed: true }, common));
 else GipDriverCabinet.mount(app, Object.assign({ screen: q.get('screen') || (common.vehicle ? 'form' : 'list'), report: q.get('report') || '' }, common));
 })();
