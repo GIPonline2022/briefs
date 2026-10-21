@@ -183,6 +183,7 @@ button.gdr-row:active { background: var(--y-soft); box-shadow: none; transform: 
 .gdr-modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, .6); }
 .gdr-ask { width: 100%; max-width: 480px; max-height: 92%; overflow-y: auto; margin: 0; padding: 18px 16px 20px; border-radius: 16px 16px 0 0; }
 .gdr-ask h2 { font-size: 21px; }
+.gdr-trip { font-size: 16px; line-height: 1.35; margin: 8px 0 10px; color: var(--k); }
 .gdr-ask .gdr-btn { margin-top: 10px; }
 .gdr-warn { margin: 12px 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--y-soft); color: var(--text); font-size: 15px; font-weight: 600; }
 /* шапка формы и замечание офиса — один закреплённый блок: замечание всегда сразу под шапкой, какой бы высоты она
@@ -537,6 +538,8 @@ var GipDriverReport = {
       var prev = t.getAttribute('data-prev') || '', typed = ((ev && ev.data) || '').replace(/\D/g, ''),
         del = !!(ev && ev.inputType && ev.inputType.indexOf('delete') === 0), raw = t.value.replace(/\D/g, ''), out = '', shown, i, c;
       if (!del && /^\d{2}:\d{2}$/.test(prev) && raw.length > 4) raw = typed || raw.slice(4);
+      // «⌫» на «ГГ:» стёр только двоеточие — стираем и последнюю цифру часа: стирание идёт по цифре.
+      if (del && /^\d{2}:$/.test(prev) && raw === prev.replace(/\D/g, '')) raw = raw.slice(0, 1);
       for (i = 0; i < raw.length && out.length < 4; i++) {
         c = raw.charAt(i);
         if (out.length === 0) out = c > '2' ? '0' + c : c;
@@ -551,8 +554,8 @@ var GipDriverReport = {
       try { t.setSelectionRange(shown.length, shown.length); } catch (x) { /* поле без выделения */ }
     }
     function timeOk(s) { var m = /^(\d{2}):(\d{2})$/.exec(s || ''); return !!m && Number(m[1]) < 24 && Number(m[2]) < 60; }
-    // Цифр меньше четырёх — подсказать, как набирать; четыре, но час или минута вне границ — сказать, что не так.
-    function timeMsg(s, example) { return /^\d{2}:\d{2}$/.test(s) ? 'Години — від 00 до 23, хвилини — від 00 до 59' : 'Допишіть хвилини — наприклад, ' + example; }
+    // Время недонабрано: час неполный — «Допишіть час», час есть, минут нет — «Допишіть хвилини». Неверного времени не бывает: оно не набирается.
+    function timeMsg(s, example) { return (s || '').replace(/\D/g, '').length < 2 ? 'Допишіть час — наприклад, ' + example : 'Допишіть хвилини — наприклад, ' + example; }
     function nowTime() { var n = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return p(n.getHours()) + ':' + p(n.getMinutes()); }
     function dec(s) { var t = String(s).replace(/\s/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN; }
     // Разделитель тысяч в полях ввода: «184250» на глазах становится «184 250». Курсор остаётся на своей цифре.
@@ -922,7 +925,7 @@ var GipDriverReport = {
         h += fld(k + 'odoPhoto', 'Фото спідометра', photoView({ id: r.id + ':odo', photo: r.odoPhoto }), { req: 1, hint: H.rOdoPhoto });
       }
       // Сумма и фото чека — при любой оплате: топливная карта, банковская карта, наличные (собственник, 2026-10-21). У бочки оплаты нет.
-      if (paid(r)) h += fld(k + 'sum', 'Сума з чека, грн', inp(k + 'sum', { mode: 'decimal', value: r.sum }), { req: 1, forId: 'f-' + k + 'sum', hint: H.rSum });
+      if (paid(r)) h += fld(k + 'sum', 'Сума з чека, грн', inp(k + 'sum', { mode: 'decimal', value: r.sum }), { req: 1, forId: 'f-' + k + 'sum', hint: H.rSum, noteOut: 'ppl' + r.id });
       if (paid(r)) h += fld(k + 'photo', 'Фото чека', photoView(r), { req: 1, hint: H.rPhoto });
       return h + '</div>';
     }
@@ -1043,6 +1046,8 @@ var GipDriverReport = {
       setOut('gap', gapText());
       if (t) t.style.display = st.refills.length ? '' : 'none';
       Array.prototype.forEach.call(el.querySelectorAll('[data-out="range"]'), function (n) { n.textContent = rangeText(); });
+      // Цена литра — подсказка под суммой: лишний ноль виден сразу. Считает телефон, не хранится, ни на что не влияет (ТЗ-004, п. 3.6).
+      st.refills.forEach(function (r) { var l = dec(r.liters), s = dec(r.sum); setOut('ppl' + r.id, l > 0 && s > 0 ? nf(s / l, 2, 2) + ' грн/л' : ''); });
       // Идёт набор — новых ошибок не считаем, а с поля, которое правят, прежнюю снимаем.
       if (st.editing) delete st.shown[st.editing]; else st.shown = currentErrors();
       paintErrors(st.shown);
@@ -1133,12 +1138,12 @@ var GipDriverReport = {
       return '<div class="gdr-modal"><div class="gdr-card gdr-ask"><h2>' + (P.report ? 'Відправити звіт знову?' : 'Відправити звіт?') + '</h2>' +
         '<p class="gdr-empty">Перевірте головне:</p>' +
         // Первой строкой — начало, конец и длительность: ошибка в дне или времени видна по длительности сразу.
-        kv('Виїзд → прибуття', shortDate(f.date) + ' ' + f.depTime + ' → ' + shortDate(f.endDate) + ' ' + f.arrTime + '<small>' + durText(mins) + '</small>') +
+        '<p class="gdr-trip"><b>Виїзд ' + shortDate(f.date) + ' ' + f.depTime + ' → Прибуття ' + shortDate(f.endDate) + ' ' + f.arrTime + ' · ' + durText(mins) + '</b></p>' +
         kv('Автомобіль', esc(v.name) + (t ? '<small>причіп ' + esc(t.name) + '</small>' : '')) + kv('Маршрут', esc(route().name)) +
         kv('Спідометр', nf(c.odoStart, 0, 0) + ' → ' + nf(int(st.f.odoEnd), 0, 0)) + kv('Пробіг', nf(c.mileage, 0, 0) + ' км') +
         kv('Заправки', n ? n + ' · ' + nf(c.tank + c.reef, 0, 2) + ' л' : 'не було') +
         '<p class="gdr-warn">Після відправки змінити звіт не можна. Виправити його вдасться, тільки якщо офіс поверне звіт вам.</p>' +
-        '<div class="gdr-hint">Вопрос перед отправкой: после неё водитель отчёт не изменит. В окне главные цифры рейса, чтобы «Так» не нажимали не глядя. Первая строка — выезд, прибытие и длительность рейса: рейс «на 26 годин» вместо двух суток сразу бросается в глаза. Длительность считается из введённого и не хранится.</div>' +
+        '<div class="gdr-hint">Вопрос перед отправкой: после неё водитель отчёт не изменит. В окне главные цифры рейса, чтобы «Так» не нажимали не глядя. Первая строка — выезд, прибытие и длительность рейса: рейс на сутки длиннее, чем был, сразу бросается в глаза. Длительность — сутки, часы, минуты, нулевые части не пишутся; считается из введённого и не хранится.</div>' +
         '<button type="button" class="gdr-btn primary" data-act="send">Так, відправити</button>' +
         '<button type="button" class="gdr-btn" data-act="unask">Ні, ще перевірю</button></div></div>';
     }
@@ -1204,7 +1209,8 @@ var GipDriverReport = {
       // прицеп и выборы в заправках остаются. Другой выбор меняет состав полей — лишнее очищается (structural).
       else if (name === 'choose') { k = st.sheet.key; if (getVal(k) !== id) { st.dirty = true; setVal(k, id); structural(k); } st.sheet = null; render(); }
       // «Щойно прибув»: дата конца — сегодня, время прибытия — текущее. Явное нажатие, а не подстановка.
-      else if (name === 'now') { st.f.endDate = today; st.f.arrTime = nowTime(); st.touched.arrTime = true; render(); }
+      // «Сегодня» — на момент нажатия, а не открытия формы: после полуночи кнопка ставит новый день, а не вчерашнюю дату с нынешним временем.
+      else if (name === 'now') { if (P.liveToday || !P.today) today = isoDate(new Date()); st.f.endDate = today; st.f.arrTime = nowTime(); st.touched.arrTime = true; render(); }
       else if (name === 'add') { st.refills.push({ id: ++uid, type: '', target: '', liters: '', fuelTypeId: '', odo: '', odoPhoto: null, full: '', sum: '', photo: null }); render(); }
       else if (name === 'del') { st.refills = st.refills.filter(function (r) { return r.id !== Number(id); }); render(); }
       else if (name === 'submit') submit();
@@ -1232,7 +1238,8 @@ var GipDriverReport = {
     // Время: при входе в поле оно выделено целиком — первая цифра начинает новое время, стирать старое не нужно.
     el.addEventListener('focusin', function (ev) {
       var t = ev.target;
-      if (t.classList && t.classList.contains('tm') && t.value) setTimeout(function () { try { t.setSelectionRange(0, t.value.length); } catch (x) { /* поле без выделения */ } }, 0);
+      // Неполное время не выделяется: курсор в конец, следующая цифра дописывает то, что просит ошибка.
+      if (t.classList && t.classList.contains('tm') && t.value) setTimeout(function () { try { if (/^\d{2}:\d{2}$/.test(t.value)) t.setSelectionRange(0, t.value.length); else t.setSelectionRange(t.value.length, t.value.length); } catch (x) { /* поле без выделения */ } }, 0);
     });
     // Ввод закончен: поле покинули. Теперь его можно проверять.
     el.addEventListener('focusout', function (ev) {
@@ -1358,7 +1365,7 @@ var GipDriverCabinet = {
 
     function openForm(report) {
       var key = report ? 'fix:' + report.number : 'new';
-      GipDriverReport.mount(fresh(), { today: today, data: data, hints: hints, report: report || null, draft: drafts[key] || null,
+      GipDriverReport.mount(fresh(), { today: today, data: data, hints: hints, report: report || null, draft: drafts[key] || null, liveToday: !/^\d{4}-\d{2}-\d{2}$/.test(P.today || ''),
         vehicle: report ? '' : (P.vehicle || ''), offline: !!P.offline,
         onDraft: function (s) { setDraft(key, s); }, onHints: function (v) { hints = v; }, onExit: openList });
       P.vehicle = '';
