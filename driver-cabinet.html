@@ -185,12 +185,23 @@ button.gdr-row:active { background: var(--y-soft); box-shadow: none; transform: 
 .gdr-ask h2 { font-size: 21px; }
 .gdr-ask .gdr-btn { margin-top: 10px; }
 .gdr-warn { margin: 12px 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--y-soft); color: var(--text); font-size: 15px; font-weight: 600; }
-/* замечание офиса при исправлении: закреплено под шапкой, по нажатию раскрывается целиком */
-.gdr-remark { position: sticky; top: 68px; z-index: 4; padding: 10px 14px; background: var(--err-bg); border-bottom: 2px solid var(--err); color: var(--text); font-size: 15px; }
+/* шапка формы и замечание офиса — один закреплённый блок: замечание всегда сразу под шапкой, какой бы высоты она
+   ни была (длинный маршрут в подзаголовке переносится, системный шрифт бывает крупным), а не на заданном отступе от верха */
+.gdr-head { position: sticky; top: 0; z-index: 5; }
+.gdr-head > .gdr-top { position: static; }
+/* замечание офиса при исправлении: закреплено под шапкой вместе с ней, по нажатию раскрывается целиком */
+.gdr-remark { padding: 10px 14px; background: var(--err-bg); border-bottom: 2px solid var(--err); color: var(--text); font-size: 15px; }
 .gdr-remark b { display: block; color: var(--err); }
 .gdr-remark p { margin: 2px 0; max-height: 2.8em; overflow: hidden; }
 .gdr-remark.open p { max-height: none; }
 .gdr-remark small { color: var(--muted); font-size: 13px; }
+/* дата и время рядом: день из списка шире, время — четыре цифры */
+.gdr-dt { display: flex; gap: 8px; align-items: flex-start; }
+.gdr-dt > .gdr-f { min-width: 0; }
+.gdr-dt > .gdr-f:first-child { flex: 1 1 60%; }
+.gdr-dt > .gdr-f:last-child { flex: 1 1 40%; }
+.gdr-dt > .gdr-f.bad { margin-left: 0; margin-right: 0; }
+.gdr-in.tm { text-align: center; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -210,7 +221,8 @@ function testData(today) {
   var d = {
     driver: { name: 'Прототипов В. С.', email: 'prototypov@example.com' },   // выдуманный водитель: по фамилии видно, что это макет
     // backdateDays — на сколько дней назад можно сдать отчёт; historyDays — за сколько дней водитель видит свои отчёты
-    settings: { backdateDays: 1, historyDays: 30 },
+    // tripMaxDays — самый длинный рейс, дней: параметр установки (PO, 2026-10-21), от него — сколько дней в списке даты начала
+    settings: { backdateDays: 1, historyDays: 30, tripMaxDays: 7 },
     fuelTypes: [{ id: 'dt', name: 'Дизель' }, { id: 'a95', name: 'Бензин А-95' }, { id: 'gas', name: 'Газ' }],
     vehicles: [
       // fuel — табличная часть «Топливо» (ТЗ-011, п. 3.3): не больше двух строк, у одной стоит main — основное топливо.
@@ -245,21 +257,23 @@ function testData(today) {
     ],
     reports: [
       // mine — отчёт этого водителя. state — состояние по ТЗ-007: submitted, returned (с замечанием офиса), approved.
+      // dep, arr — время выезда и прибытия; у отчётов, сданных до ТЗ-004 версии 0.6, его может не быть (как у 000119).
       { number: '000119', date: shift(today, -5), vehicleId: 'v3', routeId: 'r7', odoStart: 95960, odoEnd: 96180, state: 'approved', mine: true },
       // deleted — офис пометил отчёт на удаление (здесь это дубль отчёта 000121): водитель его видит, но сделать с ним ничего не может
       { number: '000120', date: shift(today, -3), vehicleId: 'v1', routeId: 'r1', odoStart: 183150, odoEnd: 183690, state: 'submitted', deleted: true, mine: true },
-      { number: '000121', date: shift(today, -3), vehicleId: 'v1', routeId: 'r1', odoStart: 183150, odoEnd: 183690, state: 'approved', mine: true,
-        refills: [{ type: 'card', target: 'tank', liters: 55, fuelTypeId: 'dt', odo: 183400, full: true, sum: null, hasPhoto: true }] },
-      { number: '000122', date: shift(today, -2), vehicleId: 'v4', routeId: 'r2', odoStart: 411760, odoEnd: 412300, state: 'returned', mine: true,
+      { number: '000121', date: shift(today, -3), dep: '06:40', arr: '16:25', vehicleId: 'v1', routeId: 'r1', odoStart: 183150, odoEnd: 183690, state: 'approved', mine: true,
+        refills: [{ type: 'card', target: 'tank', liters: 55, fuelTypeId: 'dt', odo: 183400, full: true, sum: 3135.5, hasPhoto: true, hasOdoPhoto: true }] },
+      { number: '000122', date: shift(today, -2), dep: '07:10', arr: '15:50', vehicleId: 'v4', routeId: 'r2', odoStart: 411760, odoEnd: 412300, state: 'returned', mine: true,
         remark: 'Перевірте спідометр на кінець рейсу: за звітом пробіг 540 км, а маршрут Київ — Одеса близько 480 км.',
         returnedBy: 'Диспетчер', returnedAt: shift(today, -1),
-        refills: [{ type: 'card', target: 'tank', liters: 60, fuelTypeId: 'dt', odo: 412000, full: true, sum: null, hasPhoto: true }] },
-      { number: '000123', date: shift(today, -2), vehicleId: 'v5', trailerId: 't1', routeId: 'r6', odoStart: 654920, odoEnd: 655400, state: 'submitted', mine: true,
-        refills: [{ type: 'card', target: 'tank', liters: 300, fuelTypeId: 'dt', odo: 655000, full: true, sum: null, hasPhoto: false },
-          { type: 'card', target: 'reef', liters: 80, fuelTypeId: 'dt', odo: null, full: null, sum: null, hasPhoto: false }] },
-      { number: '000124', date: shift(today, -1), vehicleId: 'v1', routeId: 'r4', routeDesc: 'Київ — Біла Церква — Умань, разове замовлення',
+        refills: [{ type: 'card', target: 'tank', liters: 60, fuelTypeId: 'dt', odo: 412000, full: true, sum: 3420, hasPhoto: true, hasOdoPhoto: true }] },
+      // рейс на два дня: начался позавчера, закончился вчера
+      { number: '000123', date: shift(today, -2), endDate: shift(today, -1), dep: '07:30', arr: '19:10', vehicleId: 'v5', trailerId: 't1', routeId: 'r6', odoStart: 654920, odoEnd: 655400, state: 'submitted', mine: true,
+        refills: [{ type: 'card', target: 'tank', liters: 300, fuelTypeId: 'dt', odo: 655000, full: true, sum: 17100, hasPhoto: true, hasOdoPhoto: true },
+          { type: 'card', target: 'reef', liters: 80, fuelTypeId: 'dt', odo: null, full: null, sum: 4560, hasPhoto: true }] },
+      { number: '000124', date: shift(today, -1), dep: '08:05', arr: '17:40', vehicleId: 'v1', routeId: 'r4', routeDesc: 'Київ — Біла Церква — Умань, разове замовлення',
         odoStart: 183690, odoPrev: 183690, odoEnd: 184250, state: 'submitted', mine: true },
-      { number: '000125', date: shift(today, -1), vehicleId: 'v3', routeId: 'r1', odoStart: 96180, odoPrev: 96180, odoEnd: 96410, state: 'submitted' }   // сдал другой водитель
+      { number: '000125', date: shift(today, -1), dep: '09:00', arr: '13:30', vehicleId: 'v3', routeId: 'r1', odoStart: 96180, odoPrev: 96180, odoEnd: 96410, state: 'submitted' }   // сдал другой водитель
     ]
   };
   d.reports = d.reports.map(function (r) { return mkReport(d, r); });
@@ -292,14 +306,17 @@ function mkReport(d, r) {
   r.trailerId = r.trailerId || (v.kind === 'tractor' ? 'none' : '');
   r.trailerName = t ? t.name : '';
   r.routeName = byId(d.routes, r.routeId).name;
-  r.routeDesc = r.routeDesc || ''; r.comment = ''; r.departed = ''; r.arrived = '';
+  r.routeDesc = r.routeDesc || ''; r.comment = '';
+  r.endDate = r.endDate || r.date;   // однодневный рейс — дата конца равна дате начала
+  // Выезд и прибытие — дата и время; у отчётов, сданных до версии 0.6, времени может не быть.
+  r.departed = r.dep ? r.date + 'T' + r.dep : ''; r.arrived = r.arr ? r.endDate + 'T' + r.arr : '';
   r.odoPrev = r.odoPrev == null ? null : r.odoPrev;
   r.mileage = r.odoEnd - r.odoStart;
   putFuel(r, tripFuels(v, r.altFuel));
   r.refills = r.refills || []; r.tank = 0; r.reef = 0; r.sum = 0;   // sum — оплачено не топливной картой
   r.refills.forEach(function (x) {
     if (x.target === 'reef') r.reef += x.liters; else r.tank += x.liters;
-    if (x.sum) r.sum += x.sum;
+    if (x.sum && (x.type === 'bank' || x.type === 'cash')) r.sum += x.sum;
   });
   return r;
 }
@@ -316,7 +333,24 @@ function byId(list, id) { return list.filter(function (x) { return x.id === id; 
 function shortDay(iso, today) {
   var p = iso.split('-'), s = p[2] + '.' + p[1];
   return iso === today ? 'сьогодні, ' + s : (iso === shift(today, -1) ? 'вчора, ' + s : s);
-}function kv(a, b) { return '<div class="gdr-kv"><span>' + a + '</span><span>' + b + '</span></div>'; }
+}
+// Выезд и прибытие хранятся датой и временем «ГГГГ-ММ-ДДTГГ:ХХ»; дата у них — дата начала и дата конца рейса.
+function timeOf(dt) { var m = /T(\d{2}:\d{2})/.exec(dt || ''); return m ? m[1] : ''; }
+function minutesOf(date, time) { var a = date.split('-').map(Number), t = time.split(':').map(Number); return Math.round(new Date(a[0], a[1] - 1, a[2], t[0], t[1]).getTime() / 60000); }
+// Сутки — с формой числа: 1 доба, 2 доби, 5 діб, 21 доба.
+function dayWord(n) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? 'доба' : ((a >= 2 && a <= 4 && (b < 12 || b > 14)) ? 'доби' : 'діб'); }
+// Дни — тоже с формой числа: 1 день, 2 дні, 10 днів, 31 день.
+function daysWord(n) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? 'день' : ((a >= 2 && a <= 4 && (b < 12 || b > 14)) ? 'дні' : 'днів'); }
+// Длительность рейса: «2 доби 11 год 40 хв». Нулевые части не пишутся; ровно ноль — «0 хв».
+function durText(min) {
+  var d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60, out = [];
+  if (d) out.push(d + ' ' + dayWord(d));
+  if (h) out.push(h + ' год');
+  if (m || !out.length) out.push(m + ' хв');
+  return out.join(' ');
+}
+function shortDate(iso) { var p = iso.split('-'); return p[2] + '.' + p[1]; }
+function kv(a, b) { return '<div class="gdr-kv"><span>' + a + '</span><span>' + b + '</span></div>'; }
 // Число для поля ввода: пробел между тысячами, дробная часть через запятую.
 function grp(n) { var s = String(n).split('.'); return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (s[1] ? ',' + s[1] : ''); }
 
@@ -338,7 +372,10 @@ function remarkHtml(r) {
 }
 // Отчёт строками «название — значение»: один и тот же вид после отправки и при просмотре из списка.
 function reportDetails(r, data) {
-  var h = kv('Дата рейсу', fmtDate(r.date)) + kv('Автомобіль', esc(r.vehicleName));
+  var end = r.endDate || r.date, dep = timeOf(r.departed), arr = timeOf(r.arrived), h;
+  // Выезд и прибытие — с датой и временем и длительностью. У отчётов, сданных до версии 0.6, времени может не быть — тогда только даты.
+  h = (dep && arr ? kv('Виїзд → прибуття', shortDate(r.date) + ' ' + dep + ' → ' + shortDate(end) + ' ' + arr + '<small>' + durText(minutesOf(end, arr) - minutesOf(r.date, dep)) + '</small>')
+    : kv('Дата початку рейсу', fmtDate(r.date)) + kv('Дата кінця рейсу', fmtDate(end))) + kv('Автомобіль', esc(r.vehicleName));
   if (r.trailerId) h += kv('Причіп', r.trailerId === 'none' ? 'без причепа' : esc(r.trailerName));
   h += kv('Маршрут', esc(r.routeName) + (r.routeDesc ? '<small>' + esc(r.routeDesc) + '</small>' : ''));
   h += kv('Спідометр', nf(r.odoStart, 0, 0) + ' → ' + nf(r.odoEnd, 0, 0) + (r.hasOdoPhoto ? '<small>є фото спідометра на кінець</small>' : ''));
@@ -357,10 +394,9 @@ function reportDetails(r, data) {
     var fuel = byId(data.fuelTypes, x.fuelTypeId);
     h += kv('Заправка ' + (i + 1), nf(x.liters, 0, 2) + ' л' + (x.target === 'reef' ? ' у реф' : ' у бак') + '<small>' +
       [fuel ? esc(low(fuel.name)) : '', TYPE[x.type], x.target === 'reef' ? '' : 'спідометр ' + nf(x.odo, 0, 0), x.target === 'reef' ? '' : (x.full ? 'до повного' : 'не до повного'),
-        x.sum ? nf(x.sum, 2, 2) + ' грн' : '', x.hasPhoto ? 'є фото чека' : ''].filter(Boolean).join(' · ') + '</small>');
+        x.hasOdoPhoto ? 'є фото спідометра' : '', x.sum ? nf(x.sum, 2, 2) + ' грн' : '', x.hasPhoto ? 'є фото чека' : ''].filter(Boolean).join(' · ') + '</small>');
   });
   if (r.sum) h += kv('Оплачено не паливною карткою', nf(r.sum, 2, 2) + ' грн');
-  if (r.departed || r.arrived) h += kv('Виїзд — прибуття', esc(String(r.departed).replace('T', ' ')) + ' — ' + esc(String(r.arrived).replace('T', ' ')));
   if (r.comment) h += kv('Коментар', esc(r.comment));
   return h + kv('Номер звіту', r.number);   // номер — в самом конце: он нужен, только чтобы назвать отчёт офису
 }
@@ -386,7 +422,11 @@ function reportDetails(r, data) {
    Возвращает { state, update(params) }. */
 
 var H = {   // пояснения к полям — для собственника и разработчика, водитель их не видит
-  date: 'Вводит водитель: выбор из списка разрешённых дней, набрать руками нельзя. По умолчанию сегодня. В списке — сегодня и столько дней назад, сколько задано настройкой.',
+  date: 'Дата начала рейса — это дата документа: по ней месяц рейса и колонка «Дата/ходка» в таблицах бухгалтерии. Вводит водитель: выбор из списка, набрать руками нельзя. По умолчанию сегодня. В списке — сегодня и назад на глубину настройки плюс длина самого длинного рейса без одного дня: глубина считается по дате конца. Длина самого длинного рейса — параметр установки «Найдовший рейс, днів» (PO, 2026-10-21), стартовое значение 7: в списке 8 дней. Рейс длиннее параметра не сдаётся, пока админ его не поднимет. Подпись дня — сначала дата, потом слово: «Сьогодні», «Вчора», «Позавчора», дальше день недели; дата впереди, чтобы даты стояли колонкой (PO, 2026-10-21).',
+  depTime: 'Время выезда — обязательно (собственник, 2026-10-21: часы нужны). Дату водитель отдельно не вводит: это дата начала рейса. Цифры на цифровой клавиатуре, двоеточие встаёт само: «0730» становится «07:30». Невозможную цифру набрать нельзя: после «2» в часах — только 0–3, десятки минут — только 0–5; первая цифра 3–9 — это 03–09, «7» сразу становится «07:». Набрать заново можно поверх: при входе в поле время выделено, первая цифра начинает новое. Так же — у времени прибытия и везде, где в системе вводят время, в том числе в офисе (PO, 2026-10-21). Без значения по умолчанию.',
+  endDate: 'Дата конца рейса (собственник, 2026-10-21). Обязательно, без значения по умолчанию: водитель выбирает сам, как машину, — подставленная дата начала незаметно превращала бы многодневный рейс в однодневный. В списке — дни от даты начала до сегодня, но не глубже настройки и не дальше 31 дня от начала. Дату начала сдвинули позже — дата конца очищается. В журнале офиса многодневный рейс закрывает все свои дни на вкладке «Без звіту».',
+  arrTime: 'Время прибытия — обязательно. Дата — это дата конца рейса. «Щойно прибув» одним нажатием ставит дату конца — сегодня и время — текущее; само оно не подставляется: водитель, который сдаёт отчёт на следующий день, кнопку не нажмёт, и подставленное «сейчас» не ошибётся за него. У однодневного рейса прибытие не раньше выезда; в будущем — нельзя. От прибытия офис считает пометку «пізно»: отчёт отправлен позже порога после прибытия (ТЗ-005, п. 3.3).',
+  blocks: '<b>Форма — по ходу рейса</b> (PO, 2026-10-21): «Початок рейсу» — при выезде, «Заправки» — прямо на заправке, «Кінець рейсу» — по прибытии. Незаконченный отчёт хранится на телефоне, его можно закрыть и продолжить. Пустой «Кінець рейсу» посреди рейса ошибкой не подсвечивается.',
   pickRoute: 'Поиск по части названия. Маршруты, требующие описания, закреплены сверху и при поиске не пропадают.',
   pickVehicle: 'У каждой строки пиктограмма и слово по типу машины из справочника: бус, грузовик, тягач; отдельно — «з рефом» и оба вида топлива, если их у машины два. Тип выбирают один раз, когда заводят машину. Сверху — до трёх последних машин этого водителя, по его отчётам. Это подсказка, а не подстановка: поле в форме остаётся пустым. Поиск по части номера, латинские и кириллические буквы не различаются. Выбывшие из парка машины не показываются.',
   vehicle: 'Вводит водитель. Поле пустое намеренно: последняя машина не подставляется, чтобы её не забывали сменить. Его последние машины стоят первыми в списке выбора.',
@@ -402,15 +442,15 @@ var H = {   // пояснения к полям — для собственни�
   norm: 'Заполняет система из справочника машин: норма того топлива, на котором шёл рейс. В отчёт копируется числом. У газодизеля, где второе топливо горит вместе с основным, — обе нормы.',
   cons: 'Считает система: пробег × норма ÷ 100, по каждому топливу рейса. Это расчёт, а не факт.',
   tripFuel: 'Только у машины на двух видах топлива, где второе идёт вместо основного (бензин и газ). Система подставляет основное топливо из справочника машин. Шёл рейс на другом — водитель нажимает кнопку под полем, причину не пишет. Рейс пополам не делится: весь пробег считается по норме выбранного топлива. У газодизеля, где оба топлива горят вместе, этого поля нет.',
-  refills: 'Заправок может быть ноль или несколько.',
+  refills: 'Заправок может быть ноль или несколько. Добавлять заправку — прямо на заправке: фото спидометра можно снять только в этот момент, а литры и сумма — с чека, а не по памяти.',
   rType: 'Обязательно, без значения по умолчанию. Бочка — своё топливо, без оплаты. Топливная карта — та, что компания выдала водителю. Банковская карта и наличные — обычная оплата на АЗС; они разведены, чтобы потом можно было различить.',
   rTarget: 'Есть, только если реф стоит на машине или на выбранном прицепе (в справочнике машин задан объём бака рефа); иначе заправка всегда в бак. Обязательно, без значения по умолчанию. Реф — холодильная установка.',
   rLiters: 'Обязательно. Число больше нуля, запятая или точка. Не больше объёма бака под это топливо (или бака рефа) из справочника машин, если он там задан. Слева — вид топлива, отдельного поля у него нет. Топливо у машины одно — его подставляет система. Два — водитель выбирает из этих двух, без значения по умолчанию. В справочнике топливо не задано — выбор из всего справочника видов топлива.',
   rOdo: 'Только для заправки в бак. Обязательно, между показаниями на начало и на конец рейса — диапазон показан под полем. По этим показаниям позже считается расход от заправки до заправки.',
   rFull: 'Только для заправки в бак. Обязательно, без значения по умолчанию — забыть нельзя.',
-  rSum: 'Только для банковской карты и наличных: там платит водитель, и чек — единственный источник суммы. Необязательно. У топливной карты поля нет: настоящую сумму, со скидкой по договору, даёт выписка топливной компании. У бочки оплаты нет.',
-  rPhoto: 'Снимок делается камерой телефона прямо из формы — это обязательная возможность; готовый можно взять из галереи. Топливная карта — фото необязательно. Банковская карта и наличные — обязательно: чек подтверждает расход. У бочки чека нет, и поля нет.',
-  times: 'Необязательно. Вопрос к собственнику: нужны ли эти поля. Заполняются оба или ни одного.',
+  rOdoPhoto: 'Обязательно у каждой заправки в бак, в том числе из бочки (собственник, 2026-10-21). Снимается в момент заправки — поэтому заправку и добавляют прямо на заправке. У заправки рефа поля нет. Цифры с фото система не распознаёт.',
+  rSum: 'Обязательно при любой оплате — топливной картой, банковской картой, наличными (собственник, 2026-10-21: выписки по топливной карте нет, чек — единственный источник суммы). В чеке топливной карты — цена колонки, а не цена по договору. У бочки оплаты нет — нет и поля.',
+  rPhoto: 'Обязательно при любой оплате, в том числе по топливной карте и при заправке рефа (собственник, 2026-10-21). Снимок делается камерой телефона прямо из формы — это обязательная возможность; готовый можно взять из галереи. У бочки чека нет, и поля нет.',
   comment: 'Необязательно. Всё, что водитель хочет сообщить офису.',
   offline: 'Если отправка не удалась, отчёт не теряется: он остаётся незаконченным на телефоне и в списке помечен «не відправлено». Повтор — только по кнопке; сам, в фоне, отчёт не уходит, иначе возможны дубли. Чтобы увидеть это в прототипе, включите на телефоне режим полёта и отправьте отчёт; на компьютере добавьте в адрес ?offline=1 — первая попытка не пройдёт, повторная пройдёт.',
   legend: '<b>Пояснения включены.</b> Жёлтое поле с пунктиром заполняет или считает система — водитель его не вводит. Звёздочка — обязательное поле. Остаток топлива водитель не вводит: он считается, расчёт появится после первого выпуска.'
@@ -418,10 +458,12 @@ var H = {   // пояснения к полям — для собственни�
 
 var REQ = "Обов'язкове поле";
 // Как поле называется в нижней полосе «що далі виправити»
-var LABEL = { date: 'дата рейсу', vehicleId: 'автомобіль', trailerId: 'причіп', routeId: 'маршрут', routeDesc: 'опис маршруту',
-  odoStart: 'спідометр на початок рейсу', odoEnd: 'спідометр на кінець рейсу', departed: 'виїзд', arrived: 'прибуття',
-  type: 'спосіб заправки', target: 'куди залито', liters: 'літри', fuelTypeId: 'вид пального', odo: 'спідометр під час заправки',
+var LABEL = { date: 'дата початку рейсу', depTime: 'час виїзду', endDate: 'дата кінця рейсу', arrTime: 'час прибуття', vehicleId: 'автомобіль', trailerId: 'причіп', routeId: 'маршрут', routeDesc: 'опис маршруту',
+  odoStart: 'спідометр на початок рейсу', odoEnd: 'спідометр на кінець рейсу',
+  type: 'спосіб заправки', target: 'куди залито', liters: 'літри', fuelTypeId: 'вид пального', odo: 'спідометр під час заправки', odoPhoto: 'фото спідометра',
   full: 'до повного бака', sum: 'сума з чека', photo: 'фото чека' };
+// День в списке дат: сначала дата, потом слово — даты стоят колонкой, подписи разной длины их не сдвигают (PO, 2026-10-21).
+var WEEKDAY = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
 // Пиктограмма берётся из типа машины в справочнике: бус, грузовик, тягач, прицеп. Рядом всегда слово: одной картинки мало.
 var KIND = { van: 'бус', truck: 'вантажівка', tractor: 'тягач' };
 var ICON = {
@@ -440,6 +482,7 @@ var GipDriverReport = {
       P = Object.assign({}, p);
       today = /^\d{4}-\d{2}-\d{2}$/.test(P.today || '') ? P.today : isoDate(new Date());
       data = P.data || testData(today);
+      if (P.tripMaxDays > 0) data.settings.tripMaxDays = P.tripMaxDays;
       // editing — поле, в котором сейчас набирают; touched — поля, которые уже заполняли; shown — ошибки на экране
       // dirty — водитель что-то изменил: с этого момента введённое отдаётся наружу как незаконченный отчёт
       st = { hints: !!P.hints, tried: false, done: null, sheet: null, editing: null, touched: {}, shown: {}, dirty: false, remarkOpen: false, f: blank(), refills: [] };
@@ -448,18 +491,27 @@ var GipDriverReport = {
     }
     function blank() {
       // altFuel — рейс шёл не на основном топливе, а на втором (только у машины, где второе топливо идёт вместо основного)
+      // depTime, arrTime — время выезда и прибытия «ГГ:ХХ»; их даты — дата начала и дата конца рейса (ТЗ-004, п. 3.3.1)
       return { date: today, vehicleId: P.vehicle || '', trailerId: '', routeId: '', routeDesc: '', odoStart: '', odoOverride: false, odoEnd: '', odoPhoto: null, altFuel: false,
-        departed: '', arrived: '', comment: '' };
+        depTime: '', arrTime: '', comment: '', endDate: '' };
     }
     // Исправление возвращённого отчёта: форма открывается заполненной тем, что водитель сдал.
     function loadReport(r) {
-      var p;
+      var p, own;
       st.f = { date: r.date, vehicleId: r.vehicleId, trailerId: r.trailerId || '', routeId: r.routeId, routeDesc: r.routeDesc || '', odoStart: '', odoOverride: false,
-        odoEnd: grp(r.odoEnd), odoPhoto: r.hasOdoPhoto ? 'kept' : null, altFuel: !!r.altFuel, departed: r.departed || '', arrived: r.arrived || '', comment: r.comment || '' };
+        odoEnd: grp(r.odoEnd), odoPhoto: r.hasOdoPhoto ? 'kept' : null, altFuel: !!r.altFuel, comment: r.comment || '',
+        depTime: timeOf(r.departed), arrTime: timeOf(r.arrived), endDate: r.endDate || '' };
+      // Спидометр на начало определяется заново (п. 3.4). Вводил ли водитель свою цифру, видно по цифрам, сохранённым
+      // при сдаче, а не по нынешнему предыдущему отчёту: тот могли исправить после сдачи, и принятая тогда подстановка
+      // выглядела бы заменой. Своя цифра — если предыдущего при сдаче не было или начало отличалось от подставленного.
+      own = r.odoPrev == null || r.odoStart !== r.odoPrev;
       p = prevReport();
-      if (!p || p.odoEnd !== r.odoStart) { st.f.odoStart = grp(r.odoStart); st.f.odoOverride = !!p; }
+      // Своей цифры не было — подставляется нынешний предыдущий. Была — остаётся его цифрой: заменой, если предыдущий
+      // сейчас есть, иначе ручным вводом. Предыдущего больше нет — в поле то, что водитель сдал.
+      if (!p || own) { st.f.odoStart = grp(r.odoStart); st.f.odoOverride = !!p; }
       st.refills = r.refills.map(function (x) {
         return { id: ++uid, type: x.type, target: x.target, liters: grp(x.liters), fuelTypeId: x.fuelTypeId || '', odo: x.odo == null ? '' : grp(x.odo),
+          odoPhoto: x.hasOdoPhoto ? 'kept' : null,
           full: x.full == null ? '' : (x.full ? 'yes' : 'no'), sum: x.sum == null ? '' : grp(x.sum), photo: x.hasPhoto ? 'kept' : null };
       });
     }
@@ -467,6 +519,8 @@ var GipDriverReport = {
     function loadDraft(d) {
       st.f = Object.assign(blank(), d.f);
       if (!P.report && (st.f.date > today || st.f.date < shift(today, -data.settings.backdateDays))) st.f.date = today;
+      // Дата конца — в пределах «от даты начала до сегодня»; иначе выбирается заново.
+      if (st.f.endDate && (st.f.endDate < st.f.date || st.f.endDate > today)) st.f.endDate = '';
       st.refills = (d.refills || []).map(function (x) { var c = Object.assign({}, x); c.id = ++uid; return c; });
       st.dirty = true;
       st.failed = !!d.failed;
@@ -476,6 +530,32 @@ var GipDriverReport = {
 
     /* ---------- разбор и показ чисел ---------- */
     function int(s) { var t = String(s).replace(/\s/g, ''); return /^\d+$/.test(t) ? Number(t) : NaN; }
+    // Время «ГГ:ХХ» — набор цифрами, двоеточие встаёт само: «0730» → «07:30».
+    // Невозможную цифру набрать нельзя — она просто не появляется: после 2 часов — только 0–3, десятки минут — только 0–5.
+    // Первая цифра часа 3–9 — это 03–09: «7» сразу становится «07:», дальше минуты.
+    // Время уже набрано полностью, а водитель набирает снова — это новое время: старое стирать не нужно.
+    // При входе в поле всё время выделено, поэтому первая же цифра его заменяет (PO, 2026-10-21).
+    function timeInput(t, ev) {
+      var prev = t.getAttribute('data-prev') || '', typed = ((ev && ev.data) || '').replace(/\D/g, ''),
+        del = !!(ev && ev.inputType && ev.inputType.indexOf('delete') === 0), raw = t.value.replace(/\D/g, ''), out = '', shown, i, c;
+      if (!del && /^\d{2}:\d{2}$/.test(prev) && raw.length > 4) raw = typed || raw.slice(4);
+      for (i = 0; i < raw.length && out.length < 4; i++) {
+        c = raw.charAt(i);
+        if (out.length === 0) out = c > '2' ? '0' + c : c;
+        else if (out.length === 1) { if (!(out === '2' && c > '3')) out += c; }
+        else if (out.length === 2) { if (c <= '5') out += c; }
+        else out += c;
+      }
+      // Двоеточие после часов — сразу, чтобы было видно, что дальше минуты; при стирании оно уходит вместе с минутами.
+      shown = (out.length > 2 || (out.length === 2 && !del)) ? out.slice(0, 2) + ':' + out.slice(2) : out;
+      t.value = shown;
+      t.setAttribute('data-prev', shown);
+      try { t.setSelectionRange(shown.length, shown.length); } catch (x) { /* поле без выделения */ }
+    }
+    function timeOk(s) { var m = /^(\d{2}):(\d{2})$/.exec(s || ''); return !!m && Number(m[1]) < 24 && Number(m[2]) < 60; }
+    // Цифр меньше четырёх — подсказать, как набирать; четыре, но час или минута вне границ — сказать, что не так.
+    function timeMsg(s, example) { return /^\d{2}:\d{2}$/.test(s) ? 'Години — від 00 до 23, хвилини — від 00 до 59' : 'Допишіть хвилини — наприклад, ' + example; }
+    function nowTime() { var n = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return p(n.getHours()) + ':' + p(n.getMinutes()); }
     function dec(s) { var t = String(s).replace(/\s/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN; }
     // Разделитель тысяч в полях ввода: «184250» на глазах становится «184 250». Курсор остаётся на своей цифре.
     function groupInput(t, decimal, ev) {
@@ -581,10 +661,12 @@ var GipDriverReport = {
     }
 
     function validate() {
-      var e = {}, f = st.f, min = shift(today, -data.settings.backdateDays);
+      var e = {}, f = st.f, min = minStart();
       if (!f.date) e.date = REQ;
-      else if (f.date > today) e.date = 'Дата рейсу не може бути в майбутньому';
-      else if (f.date < min && !(P.report && f.date === P.report.date)) e.date = 'Звіт можна здати не раніше ніж за ' + fmtDate(min);
+      else if (f.date > today) e.date = 'Дата початку рейсу не може бути в майбутньому';
+      else if (f.date < min && !(P.report && f.date === P.report.date)) e.date = 'Рейс не може початися раніше ніж ' + fmtDate(min);
+      if (f.depTime === '') e.depTime = REQ;
+      else if (!timeOk(f.depTime)) e.depTime = timeMsg(f.depTime, '0730');
       if (!f.vehicleId) e.vehicleId = 'Оберіть автомобіль';
       if (vehicle() && vehicle().kind === 'tractor' && !f.trailerId) e.trailerId = 'Оберіть причіп або «Без причепа»';
       if (!f.routeId) e.routeId = 'Оберіть маршрут';
@@ -601,8 +683,17 @@ var GipDriverReport = {
       else if (isNaN(int(f.odoEnd))) e.odoEnd = 'Введіть повний показник — ціле число';
       else { en = int(f.odoEnd); if (!isNaN(s) && en < s) e.odoEnd = 'Менше, ніж на початок рейсу'; }
 
-      if (!!f.departed !== !!f.arrived) e[f.departed ? 'arrived' : 'departed'] = 'Заповніть обидва поля або жодного';
-      else if (f.departed && f.arrived < f.departed) e.arrived = 'Прибуття раніше за виїзд';
+      // Дата конца рейса — обязательна, не раньше даты начала, не в будущем, не глубже настройки и не дальше 31 дня от начала (п. 3.3.1).
+      if (!f.endDate) e.endDate = REQ;
+      else if (f.endDate < f.date) e.endDate = 'Раніше за дату початку рейсу';
+      else if (f.endDate > today) e.endDate = 'Дата кінця рейсу не може бути в майбутньому';
+      else if (f.endDate < minEnd() && !(P.report && f.endDate === P.report.endDate)) e.endDate = 'Рейс, що закінчився раніше ніж ' + fmtDate(minEnd()) + ', здати вже не можна';
+      else if (f.date && f.endDate > maxEndFor(f.date)) e.endDate = 'Рейс не може тривати довше ніж ' + data.settings.tripMaxDays + ' ' + daysWord(data.settings.tripMaxDays);
+      // Время прибытия — обязательно; у однодневного рейса не раньше выезда; сегодня — не позже, чем сейчас.
+      if (f.arrTime === '') e.arrTime = REQ;
+      else if (!timeOk(f.arrTime)) e.arrTime = timeMsg(f.arrTime, '1910');
+      else if (f.endDate && f.endDate === f.date && timeOk(f.depTime) && f.arrTime < f.depTime) e.arrTime = 'Раніше за час виїзду';
+      else if (f.endDate === today && f.arrTime > nowTime()) e.arrTime = 'Час прибуття ще не настав';
 
       st.refills.forEach(function (r) {
         var k = 'r' + r.id + '.';
@@ -616,10 +707,13 @@ var GipDriverReport = {
           if (r.odo === '') e[k + 'odo'] = REQ;
           else if (isNaN(int(r.odo))) e[k + 'odo'] = 'Введіть ціле число';
           else if ((!isNaN(s) && int(r.odo) < s) || (!isNaN(en) && int(r.odo) > en)) e[k + 'odo'] = 'Має бути між показниками на початок і на кінець рейсу';
+          if (!r.odoPhoto) e[k + 'odoPhoto'] = "Фото спідометра обов'язкове";
           if (!r.full) e[k + 'full'] = 'Оберіть: так чи ні';
         }
-        if (own(r) && r.sum !== '' && !(dec(r.sum) > 0)) e[k + 'sum'] = 'Число більше нуля, не більше двох знаків після коми';
-        if (own(r) && !r.photo) e[k + 'photo'] = "Фото чека обов'язкове, якщо платили не паливною карткою";
+        // За деньги — топливная карта, банковская карта, наличные: сумма и фото чека обязательны (собственник, 2026-10-21).
+        if (paid(r) && r.sum === '') e[k + 'sum'] = REQ;
+        else if (paid(r) && !(dec(r.sum) > 0)) e[k + 'sum'] = 'Число більше нуля, не більше двох знаків після коми';
+        if (paid(r) && !r.photo) e[k + 'photo'] = "Фото чека обов'язкове";
       });
       return e;
     }
@@ -745,18 +839,51 @@ var GipDriverReport = {
         '<div class="gdr-search"><input class="gdr-in" type="search" data-q="1" placeholder="' + c.ph + '" autocomplete="off" value="' + esc(s.q) + '"></div>' +
         '<div class="gdr-hint gdr-pad">' + c.hint + '</div><div class="gdr-list" data-out="picklist">' + pickList() + '</div></div>';
     }
-    // Дата — выпадающий список разрешённых дней: сегодня и назад на глубину настройки. Руками не вводится.
+    // Дата — выпадающий список разрешённых дней, руками не вводится. Подпись — сначала дата, потом слово:
+    // «21.10 · Сьогодні», «20.10 · Вчора», «19.10 · Позавчора», дальше день недели — «18.10 · Неділя».
     function dateText(d) {
-      return fmtDate(d) + (d === today ? ' · сьогодні' : (d === shift(today, -1) ? ' · вчора' : ''));
+      var a = d.split('-').map(Number);
+      return shortDate(d) + ' · ' + (d === today ? 'Сьогодні' : d === shift(today, -1) ? 'Вчора' : d === shift(today, -2) ? 'Позавчора' : WEEKDAY[new Date(a[0], a[1] - 1, a[2]).getDay()]);
     }
+    // Самая ранняя дата начала: глубина считается по дате конца, а рейс длится не дольше параметра «Найдовший рейс» (ТЗ-004, п. 3.3.1).
+    function minStart() { return shift(today, -(data.settings.backdateDays + data.settings.tripMaxDays - 1)); }
+    // Последний день рейса, начатого в этот день: рейс не дольше параметра, день начала и день конца считаются.
+    function maxEndFor(start) { return shift(start, data.settings.tripMaxDays - 1); }
+    // Самая ранняя дата конца — на глубину настройки.
+    function minEnd() { return shift(today, -data.settings.backdateDays); }
     function dateSel() {
-      var list = [], i;
-      for (i = 0; i <= data.settings.backdateDays; i++) list.push(shift(today, -i));
+      var list = [], d;
+      for (d = today; d >= minStart(); d = shift(d, -1)) list.push(d);
       // При исправлении дата самого отчёта остаётся в списке, даже если она уже старше разрешённой глубины.
       if (P.report && list.indexOf(P.report.date) < 0) list.push(P.report.date);
-      return '<select class="gdr-in" id="f-date" data-f="date">' + list.map(function (d) {
-        return '<option value="' + d + '"' + (d === st.f.date ? ' selected' : '') + '>' + dateText(d) + '</option>';
+      return '<select class="gdr-in" id="f-date" data-f="date">' + list.map(function (x) {
+        return '<option value="' + x + '"' + (x === st.f.date ? ' selected' : '') + '>' + dateText(x) + '</option>';
       }).join('') + '</select>';
+    }
+    // Дата конца рейса — тем же списком: от даты начала до сегодня, но не глубже настройки и не дальше самого длинного рейса,
+    // свежие сверху. По умолчанию пусто — водитель выбирает сам.
+    function endDateSel() {
+      var list = [], d, last = st.f.date ? maxEndFor(st.f.date) : today;
+      for (d = today; st.f.date && d >= st.f.date && d >= minEnd(); d = shift(d, -1)) if (d <= last) list.push(d);
+      if (P.report && P.report.endDate && list.indexOf(P.report.endDate) < 0 && P.report.endDate >= st.f.date) list.push(P.report.endDate);
+      return '<select class="gdr-in" id="f-endDate" data-f="endDate"><option value="">— оберіть дату —</option>' + list.map(function (x) {
+        return '<option value="' + x + '"' + (x === st.f.endDate ? ' selected' : '') + '>' + dateText(x) + '</option>';
+      }).join('') + '</select>';
+    }
+    function timeInp(key) {
+      return '<input class="gdr-in tm" id="f-' + key + '" data-f="' + key + '" type="text" inputmode="numeric" placeholder="ГГ:ХХ" value="' + esc(st.f[key]) +
+        '" data-prev="' + esc(st.f[key]) + '" enterkeyhint="done" autocomplete="off">';
+    }
+    // Дата и время — одной строкой: день из списка и рядом время.
+    function dateTime(dateKey, dateLabel, dateCtl, dateHint, timeKey, timeLabel, timeHint) {
+      return '<div class="gdr-dt">' + fld(dateKey, dateLabel, dateCtl, { req: 1, forId: 'f-' + dateKey, hint: dateHint }) +
+        fld(timeKey, timeLabel, timeInp(timeKey), { req: 1, forId: 'f-' + timeKey, hint: timeHint }) + '</div>';
+    }
+    // Длительность рейса — от выезда до прибытия; пока чего-то нет, длительности нет.
+    function tripMinutes() {
+      var f = st.f;
+      if (!f.date || !f.endDate || !timeOk(f.depTime) || !timeOk(f.arrTime)) return null;
+      return minutesOf(f.endDate, f.arrTime) - minutesOf(f.date, f.depTime);
     }
 
     function head() {
@@ -795,10 +922,12 @@ var GipDriverReport = {
       if (target(r) === 'tank') {
         h += fld(k + 'full', 'Залито до повного бака?', seg(k + 'full', [['yes', 'Так'], ['no', 'Ні']], r.full), { req: 1, hint: H.rFull });
         h += fld(k + 'odo', 'Спідометр під час заправки, км', inp(k + 'odo', { mode: 'numeric', value: r.odo }), { req: 1, forId: 'f-' + k + 'odo', hint: H.rOdo, note: rangeText(), noteOut: 'range' });
+        // Фото спидометра — сразу под спидометром, у каждой заправки в бак, в том числе из бочки (собственник, 2026-10-21).
+        h += fld(k + 'odoPhoto', 'Фото спідометра', photoView({ id: r.id + ':odo', photo: r.odoPhoto }), { req: 1, hint: H.rOdoPhoto });
       }
-      // Сумма — только там, где платил водитель: банковская карта и наличные. По топливной карте её даёт выписка топливной компании.
-      if (own(r)) h += fld(k + 'sum', 'Сума з чека, грн', inp(k + 'sum', { mode: 'decimal', value: r.sum }), { forId: 'f-' + k + 'sum', hint: H.rSum });
-      if (paid(r)) h += fld(k + 'photo', 'Фото чека', photoView(r), { req: own(r) ? 1 : 0, hint: H.rPhoto });
+      // Сумма и фото чека — при любой оплате: топливная карта, банковская карта, наличные (собственник, 2026-10-21). У бочки оплаты нет.
+      if (paid(r)) h += fld(k + 'sum', 'Сума з чека, грн', inp(k + 'sum', { mode: 'decimal', value: r.sum }), { req: 1, forId: 'f-' + k + 'sum', hint: H.rSum });
+      if (paid(r)) h += fld(k + 'photo', 'Фото чека', photoView(r), { req: 1, hint: H.rPhoto });
       return h + '</div>';
     }
 
@@ -823,14 +952,16 @@ var GipDriverReport = {
       var f = st.f, v = vehicle(), p = prevReport(), rt = route(), u = used();
       var h = head();
       // Исправление: замечание офиса закреплено под шапкой, чтобы оно было перед глазами, пока водитель правит.
+      // Шапка и замечание — один закреплённый блок (.gdr-head): замечание стоит сразу под шапкой любой высоты.
       if (P.report && P.report.remark) {
-        h += '<div class="gdr-remark' + (st.remarkOpen ? ' open' : '') + '" data-act="remark"><b>Зауваження офісу</b><p>' + esc(P.report.remark) + '</p>' +
-          '<small>' + esc(P.report.returnedBy || '') + (P.report.returnedAt ? ' · ' + fmtDate(P.report.returnedAt) : '') + ' · натисніть, щоб ' + (st.remarkOpen ? 'згорнути' : 'розгорнути') + '</small></div>';
+        h = '<div class="gdr-head">' + h + '<div class="gdr-remark' + (st.remarkOpen ? ' open' : '') + '" data-act="remark"><b>Зауваження офісу</b><p>' + esc(P.report.remark) + '</p>' +
+          '<small>' + esc(P.report.returnedBy || '') + (P.report.returnedAt ? ' · ' + fmtDate(P.report.returnedAt) : '') + ' · натисніть, щоб ' + (st.remarkOpen ? 'згорнути' : 'розгорнути') + '</small></div></div>';
       }
-      h += '<div class="gdr-note">' + H.legend + '</div>';
+      h += '<div class="gdr-note">' + H.legend + '</div><div class="gdr-note">' + H.blocks + '</div>';
 
-      h += '<div class="gdr-card"><h2>Рейс</h2>';
-      h += fld('date', 'Дата рейсу', dateSel(), { req: 1, forId: 'f-date', hint: H.date });
+      // Форма — по ходу рейса: начало — при выезде, заправки — на заправке, конец — по прибытии (PO, 2026-10-21).
+      h += '<div class="gdr-card"><h2>Початок рейсу</h2>';
+      h += dateTime('date', 'Дата початку рейсу', dateSel(), H.date, 'depTime', 'Час виїзду', H.depTime);
       h += fld('vehicleId', 'Автомобіль', pickBtn('vehicleId', v ? unitIcon(v) + esc(v.name) + (v.kind === 'tractor' ? ' · тягач' : '') : '', 'pick', '— оберіть автомобіль —'), { req: 1, forId: 'f-vehicleId', hint: H.vehicle });
       if (v && v.kind === 'tractor') {
         h += fld('trailerId', 'Причіп', pickBtn('trailerId', f.trailerId === 'none' ? 'Без причепа' : (trailer() ? unitIcon(trailer()) + esc(trailer().name) : ''), 'pick', '— оберіть причіп —'),
@@ -840,9 +971,6 @@ var GipDriverReport = {
       if (rt && rt.descRequired) {
         h += fld('routeDesc', 'Опис маршруту', '<textarea class="gdr-in" id="f-routeDesc" data-f="routeDesc" placeholder="Куди їздили">' + esc(f.routeDesc) + '</textarea>', { req: 1, forId: 'f-routeDesc', hint: H.routeDesc });
       }
-      h += '</div>';
-
-      h += '<div class="gdr-card"><h2>Спідометр і пальне</h2>';
       if (!v) h += fld('odoStart', 'Спідометр на початок рейсу, км', auto('', '—', 'оберіть автомобіль', true), { hint: H.odoStart });
       else if (p && !f.odoOverride) h += fld('odoStart', 'Спідометр на початок рейсу, км', auto('', nf(p.odoEnd, 0, 0), 'зі звіту № ' + p.number + ' від ' + fmtDate(p.date), true),
         { hint: H.odoStart, after: '<button type="button" class="gdr-alt" data-act="ovr">На спідометрі інший показник</button>' });
@@ -850,10 +978,6 @@ var GipDriverReport = {
         { req: 1, forId: 'f-odoStart', hint: H.odoStart, note: 'За звітом № ' + p.number + ' від ' + fmtDate(p.date) + ' — ' + nf(p.odoEnd, 0, 0),
           after: '<div class="gdr-lim" data-out="gap"></div><button type="button" class="gdr-alt" data-act="ovr">Повернути показник із попереднього звіту</button>' });
       else h += fld('odoStart', 'Спідометр на початок рейсу, км', inp('odoStart', { mode: 'numeric', value: f.odoStart, ph: 'Попереднього звіту немає' }), { req: 1, forId: 'f-odoStart', hint: H.odoStartManual });
-      h += fld('odoEnd', 'Спідометр на кінець рейсу, км', inp('odoEnd', { mode: 'numeric', value: f.odoEnd, ph: 'Повний показник' }), { req: 1, forId: 'f-odoEnd', hint: H.odoEnd });
-      // Фото спидометра на конец рейса — необязательно (собственник, 2026-10-14). Камера — как у фото чека.
-      h += fld('odoPhoto', 'Фото спідометра на кінець рейсу', photoView({ id: 'odo', photo: f.odoPhoto }), { hint: H.odoPhoto });
-      h += fld('mileage', 'Пробіг, км', auto('mileage', '—', '', true), { hint: H.mileage });
       // Пальне в рейсі — только у машины, где второе топливо идёт вместо основного (instead). Подставлено основное;
       // водитель меняет его кнопкой, как спидометр на начало, и так же может вернуть.
       if (altVehicle()) {
@@ -861,21 +985,30 @@ var GipDriverReport = {
           { hint: H.tripFuel, after: '<button type="button" class="gdr-alt" data-act="altfuel">' +
             (f.altFuel ? 'Повернути основне: ' + esc(fuelName(fuelsOf(v)[0].fuelTypeId)) : 'Інше пальне: ' + esc(fuelName(fuelsOf(v)[1].fuelTypeId))) + '</button>' });
       }
-      h += fld('norm', 'Норма витрати, л на 100 км', normBox(v, u), { hint: H.norm });
-      h += fld('cons', 'Розрахункова витрата, л', auto('cons', '—', '', true), { hint: H.cons });
       h += '</div>';
 
       h += '<div class="gdr-card"><h2>Заправки</h2>';
-      if (!st.refills.length) h += '<p class="gdr-empty">Якщо заправок не було, нічого не додавайте.</p>';
+      if (!st.refills.length) h += '<p class="gdr-empty">Якщо заправок не було, нічого не додавайте. Заправку додавайте одразу на заправці — з фото спідометра й чека.</p>';
       st.refills.forEach(function (r, i) { h += refillView(r, i); });
       h += '<div class="gdr-sum" data-out="totals" style="display:none"></div>';
       h += '<div class="gdr-f"><button type="button" class="gdr-btn ghost" data-act="add">+ Додати заправку</button><div class="gdr-hint">' + H.refills + '</div></div>';
       h += '</div>';
 
-      h += '<div class="gdr-card"><h2>Додатково</h2>';
-      h += fld('departed', 'Виїзд', inp('departed', { type: 'datetime-local', value: f.departed }), { forId: 'f-departed', hint: H.times });
-      h += fld('arrived', 'Прибуття', inp('arrived', { type: 'datetime-local', value: f.arrived }), { forId: 'f-arrived' });
-      h += fld('comment', 'Коментар', '<textarea class="gdr-in" id="f-comment" data-f="comment">' + esc(f.comment) + '</textarea>', { forId: 'f-comment', hint: H.comment });
+      // Конец рейса — по прибытии: дата и время прибытия рядом со спидометром на конец, это один момент.
+      // Дата конца — в последнем блоке рейса (собственник, 2026-10-21: «в кінець»).
+      h += '<div class="gdr-card"><h2>Кінець рейсу</h2>';
+      h += dateTime('endDate', 'Дата кінця рейсу', endDateSel(), H.endDate, 'arrTime', 'Час прибуття', H.arrTime);
+      h += '<button type="button" class="gdr-alt gdr-now" data-act="now">Щойно прибув</button>';
+      h += fld('odoEnd', 'Спідометр на кінець рейсу, км', inp('odoEnd', { mode: 'numeric', value: f.odoEnd, ph: 'Повний показник' }), { req: 1, forId: 'f-odoEnd', hint: H.odoEnd });
+      // Фото спидометра на конец рейса — необязательно (собственник, 2026-10-14). Камера — как у фото чека.
+      h += fld('odoPhoto', 'Фото спідометра на кінець рейсу', photoView({ id: 'odo', photo: f.odoPhoto }), { hint: H.odoPhoto });
+      h += fld('mileage', 'Пробіг, км', auto('mileage', '—', '', true), { hint: H.mileage });
+      h += fld('norm', 'Норма витрати, л на 100 км', normBox(v, u), { hint: H.norm });
+      h += fld('cons', 'Розрахункова витрата, л', auto('cons', '—', '', true), { hint: H.cons });
+      h += '</div>';
+
+      h += '<div class="gdr-card"><h2>Коментар</h2>';
+      h += fld('comment', 'Що варто знати офісу', '<textarea class="gdr-in" id="f-comment" data-f="comment">' + esc(f.comment) + '</textarea>', { forId: 'f-comment', hint: H.comment });
       h += '</div>';
 
       h += '<div class="gdr-actions"><button type="button" class="gdr-btn primary" data-act="submit">' + (P.report ? 'Відправити знову' : 'Відправити звіт') + '</button></div>';
@@ -977,11 +1110,11 @@ var GipDriverReport = {
       if (k === 'vehicleId') { st.f.odoStart = ''; st.f.odoOverride = false; st.f.altFuel = false; st.f.trailerId = ''; st.refills.forEach(function (x) { x.fuelTypeId = ''; x.target = ''; }); }
       if (k === 'trailerId') st.refills.forEach(function (x) { x.target = ''; });   // с другим прицепом реф мог появиться или пропасть
       if (k === 'routeId' && !(route() && route().descRequired)) st.f.routeDesc = '';
+      if (k === 'date' && st.f.endDate && st.f.endDate < st.f.date) st.f.endDate = '';   // дата начала ушла позже даты конца — дата конца заново
       if (m) {
         r = refillById(m[1]);
-        if (r && !own(r)) r.sum = '';
-        if (r && !paid(r)) r.photo = null;
-        if (r && target(r) !== 'tank') { r.odo = ''; r.full = ''; }
+        if (r && !paid(r)) { r.sum = ''; r.photo = null; }
+        if (r && target(r) !== 'tank') { r.odo = ''; r.full = ''; r.odoPhoto = null; }
       }
     }
 
@@ -998,13 +1131,16 @@ var GipDriverReport = {
     }
     function askView() {
       var c = calc(), v = vehicle(), t = trailer(), n = st.refills.length;
+      var f = st.f, mins = tripMinutes();
       return '<div class="gdr-modal"><div class="gdr-card gdr-ask"><h2>' + (P.report ? 'Відправити звіт знову?' : 'Відправити звіт?') + '</h2>' +
         '<p class="gdr-empty">Перевірте головне:</p>' +
+        // Первой строкой — начало, конец и длительность: ошибка в дне или времени видна по длительности сразу.
+        kv('Виїзд → прибуття', shortDate(f.date) + ' ' + f.depTime + ' → ' + shortDate(f.endDate) + ' ' + f.arrTime + '<small>' + durText(mins) + '</small>') +
         kv('Автомобіль', esc(v.name) + (t ? '<small>причіп ' + esc(t.name) + '</small>' : '')) + kv('Маршрут', esc(route().name)) +
         kv('Спідометр', nf(c.odoStart, 0, 0) + ' → ' + nf(int(st.f.odoEnd), 0, 0)) + kv('Пробіг', nf(c.mileage, 0, 0) + ' км') +
         kv('Заправки', n ? n + ' · ' + nf(c.tank + c.reef, 0, 2) + ' л' : 'не було') +
         '<p class="gdr-warn">Після відправки змінити звіт не можна. Виправити його вдасться, тільки якщо офіс поверне звіт вам.</p>' +
-        '<div class="gdr-hint">Вопрос перед отправкой: после неё водитель отчёт не изменит. В окне главные цифры рейса, чтобы «Так» не нажимали не глядя.</div>' +
+        '<div class="gdr-hint">Вопрос перед отправкой: после неё водитель отчёт не изменит. В окне главные цифры рейса, чтобы «Так» не нажимали не глядя. Первая строка — выезд, прибытие и длительность рейса: рейс «на 26 годин» вместо двух суток сразу бросается в глаза. Длительность считается из введённого и не хранится.</div>' +
         '<button type="button" class="gdr-btn primary" data-act="send">Так, відправити</button>' +
         '<button type="button" class="gdr-btn" data-act="unask">Ні, ще перевірю</button></div></div>';
     }
@@ -1035,12 +1171,13 @@ var GipDriverReport = {
         routeId: st.f.routeId, routeName: route().name, routeDesc: st.f.routeDesc.trim(),
         odoStart: c.odoStart, odoPrev: p ? p.odoEnd : null,   // хранятся обе цифры: фактическая и из предыдущего отчёта
         odoEnd: int(st.f.odoEnd), hasOdoPhoto: !!st.f.odoPhoto, mileage: c.mileage, altFuel: altVehicle() && st.f.altFuel,
-        departed: st.f.departed, arrived: st.f.arrived, comment: st.f.comment.trim(),
+        // Выезд и прибытие — дата и время; дата у них — дата начала и дата конца рейса.
+        departed: st.f.date + 'T' + st.f.depTime, arrived: st.f.endDate + 'T' + st.f.arrTime, comment: st.f.comment.trim(), endDate: st.f.endDate,
         refills: st.refills.map(function (r) {
           var t = target(r);
           return { type: r.type, target: t, liters: dec(r.liters), fuelTypeId: n || r.fuelTypeId,
-            odo: t === 'tank' ? int(r.odo) : null, full: t === 'tank' ? r.full === 'yes' : null,
-            sum: (own(r) && r.sum !== '') ? dec(r.sum) : null, hasPhoto: !!r.photo };
+            odo: t === 'tank' ? int(r.odo) : null, full: t === 'tank' ? r.full === 'yes' : null, hasOdoPhoto: t === 'tank' && !!r.odoPhoto,
+            sum: paid(r) ? dec(r.sum) : null, hasPhoto: !!r.photo };
         }),
         tank: c.tank, reef: c.reef, sum: c.sum
       };
@@ -1057,7 +1194,7 @@ var GipDriverReport = {
 
     function act(name, id) {
       var k;
-      if (name === 'ovr' || name === 'altfuel' || name === 'choose' || name === 'add' || name === 'del' || name === 'delphoto') st.dirty = true;
+      if (name === 'ovr' || name === 'altfuel' || name === 'add' || name === 'del' || name === 'delphoto' || name === 'now') st.dirty = true;
       if (name === 'hints') { st.hints = !st.hints; if (typeof P.onHints === 'function') P.onHints(st.hints); render(); }
       else if (name === 'back') { document.body.style.overflow = ''; if (typeof P.onExit === 'function') P.onExit(); }
       else if (name === 'remark') { st.remarkOpen = !st.remarkOpen; render(); }
@@ -1065,8 +1202,12 @@ var GipDriverReport = {
       else if (name === 'close') { st.sheet = null; render(); }
       else if (name === 'ovr') { st.f.odoOverride = !st.f.odoOverride; st.f.odoStart = ''; render(); }
       else if (name === 'altfuel') { st.f.altFuel = !st.f.altFuel; render(); }
-      else if (name === 'choose') { k = st.sheet.key; setVal(k, id); structural(k); st.sheet = null; render(); }
-      else if (name === 'add') { st.refills.push({ id: ++uid, type: '', target: '', liters: '', fuelTypeId: '', odo: '', full: '', sum: '', photo: null }); render(); }
+      // Тот же выбор ещё раз (та же машина в списке) ничего не меняет: список просто закрывается, а своя цифра на начало,
+      // прицеп и выборы в заправках остаются. Другой выбор меняет состав полей — лишнее очищается (structural).
+      else if (name === 'choose') { k = st.sheet.key; if (getVal(k) !== id) { st.dirty = true; setVal(k, id); structural(k); } st.sheet = null; render(); }
+      // «Щойно прибув»: дата конца — сегодня, время прибытия — текущее. Явное нажатие, а не подстановка.
+      else if (name === 'now') { st.f.endDate = today; st.f.arrTime = nowTime(); st.touched.arrTime = true; render(); }
+      else if (name === 'add') { st.refills.push({ id: ++uid, type: '', target: '', liters: '', fuelTypeId: '', odo: '', odoPhoto: null, full: '', sum: '', photo: null }); render(); }
       else if (name === 'del') { st.refills = st.refills.filter(function (r) { return r.id !== Number(id); }); render(); }
       else if (name === 'submit') submit();
       else if (name === 'send') send();
@@ -1075,6 +1216,7 @@ var GipDriverReport = {
       else if (name === 'showerr') showErr(true);
       else if (name === 'new') { st.tried = false; st.done = null; st.dirty = false; st.touched = {}; st.shown = {}; st.f = blank(); st.refills = []; render(); window.scrollTo(0, 0); }
       else if (name === 'delphoto' && id === 'odo') { st.f.odoPhoto = null; render(); }
+      else if (name === 'delphoto' && /:odo$/.test(id)) { k = refillById(parseInt(id, 10)); if (k) k.odoPhoto = null; render(); }   // фото спидометра заправки
       else if (name === 'delphoto') { k = refillById(id); if (k) k.photo = null; render(); }
     }
 
@@ -1082,11 +1224,17 @@ var GipDriverReport = {
       var t = ev.target, k = t.getAttribute('data-f');
       if (t.getAttribute('data-q') && st.sheet) { st.sheet.q = t.value; setOut('picklist', pickList()); return; }   // поиск: обновляем только список
       if (!k || t.type === 'radio' || t.tagName === 'SELECT') return;
-      if (t.classList.contains('num')) groupInput(t, t.getAttribute('inputmode') === 'decimal', ev);
+      if (t.classList.contains('tm')) timeInput(t, ev);   // время: недопустимые цифры не набираются, набор поверх — новое время
+      else if (t.classList.contains('num')) groupInput(t, t.getAttribute('inputmode') === 'decimal', ev);
       setVal(k, t.value);
       st.editing = k;
       st.dirty = true;
       refresh();
+    });
+    // Время: при входе в поле оно выделено целиком — первая цифра начинает новое время, стирать старое не нужно.
+    el.addEventListener('focusin', function (ev) {
+      var t = ev.target;
+      if (t.classList && t.classList.contains('tm') && t.value) setTimeout(function () { try { t.setSelectionRange(0, t.value.length); } catch (x) { /* поле без выделения */ } }, 0);
     });
     // Ввод закончен: поле покинули. Теперь его можно проверять.
     el.addEventListener('focusout', function (ev) {
@@ -1106,6 +1254,12 @@ var GipDriverReport = {
       if (t.getAttribute('data-photo') === 'odo') {
         file = t.files && t.files[0];
         if (file) { try { st.f.odoPhoto = URL.createObjectURL(file); } catch (x) { st.f.odoPhoto = null; } st.dirty = true; render(); }
+        return;
+      }
+      // Фото спидометра заправки: data-photo «<id>:odo».
+      if (/:odo$/.test(t.getAttribute('data-photo') || '')) {
+        r = refillById(parseInt(t.getAttribute('data-photo'), 10)); file = t.files && t.files[0];
+        if (r && file) { try { r.odoPhoto = URL.createObjectURL(file); } catch (x) { r.odoPhoto = null; } st.dirty = true; render(); }
         return;
       }
       if (t.getAttribute('data-photo')) {
@@ -1141,7 +1295,7 @@ var HC = {   // пояснения к экранам кабинета
   login: 'Экран входа здесь — имитация, настоящий вход описан в ТЗ-013.',
   top: '<b>Первый экран кабинета.</b> Уведомлений в системе нет: о возврате водитель узнаёт, когда откроет кабинет. Поэтому возвращённые отчёты стоят первыми. Список обновляется сам — при каждом открытии кабинета и при возврате в него из другого приложения; отдельной кнопки нет, страницу можно обновить обычным жестом браузера.',
   ret: 'Возвращённые отчёты показываются всегда, независимо от периода (ТЗ-007, п. 3.8). Замечание офиса обязательно и видно целиком (п. 3.4). Если офис подтвердил отчёт или отменил возврат, незаконченные правки к нему удаляются с телефона: отправить их уже нельзя (ТЗ-007, п. 3.3).',
-  draft: 'Незаконченный отчёт хранится на телефоне и в систему не попадает (ТЗ-007, п. 3.2). Он один: пока он есть, вместо «Новий звіт» предлагается его продолжить.',
+  draft: 'Незаконченный отчёт хранится на телефоне и в систему не попадает (ТЗ-007, п. 3.2). Он один: пока он есть, вместо «Новий звіт» предлагается его продолжить. Его заполняют по ходу рейса: начало — при выезде, заправки — прямо на заправке, конец — по прибытии (ТЗ-004, п. 3.2).',
   list: 'Свои отчёты за период из настройки, сейчас 30 дней. В строке главное — маршрут, под ним дата, машина и пробег; номер отчёта мелко, он нужен, только чтобы назвать отчёт офису. Состояние — значком и словом. Изменить можно только отчёт на исправлении. Отчёт, который офис пометил на удаление, остаётся в списке приглушённым, с пометкой (ТЗ-007, п. 3.10).',
   view: 'Просмотр без правки: отправленный и подтверждённый отчёт водитель изменить не может (решение собственника 07.08). Кнопка «Виправити» есть только у отчёта, который вернул офис.'
 };
@@ -1186,6 +1340,7 @@ var GipDriverCabinet = {
     var P = Object.assign({}, params);
     var today = /^\d{4}-\d{2}-\d{2}$/.test(P.today || '') ? P.today : isoDate(new Date());
     var data = P.data || testData(today), hints = !!P.hints, drafts = {};
+    if (P.tripMaxDays > 0) data.settings.tripMaxDays = P.tripMaxDays;   // ?trip=10 — показать, как список дат зависит от параметра
 
     // Незаконченные отчёты живут на телефоне: в памяти страницы и, если браузер позволяет, в его хранилище —
     // тогда они переживают перезагрузку. Фото в хранилище не кладётся.
@@ -1300,13 +1455,15 @@ var GipDriverCabinet = {
      ?screen=fix&report=000122    сразу исправление возвращённого отчёта
      ?screen=view&report=000124   сразу просмотр отчёта
      ?offline=1                   показать отправку без связи: первая попытка не проходит, повторная проходит
+     ?trip=14                     параметр «Найдовший рейс» — 14 дней вместо стартовых 7: список дат начала длиннее
      ?embed=1                     одна форма без шапки и без кабинета — для вставки в другой дизайн */
 
 window.GipDriverReport = GipDriverReport;
 window.GipReportView = GipReportView;
 window.GipDriverCabinet = GipDriverCabinet;
 var q = new URLSearchParams(window.location.search), app = document.getElementById('app');
-var common = { hints: q.get('hints') === '1', today: q.get('today') || '', vehicle: q.get('vehicle') || '', offline: q.get('offline') === '1' };
+var common = { hints: q.get('hints') === '1', today: q.get('today') || '', vehicle: q.get('vehicle') || '', offline: q.get('offline') === '1',
+  tripMaxDays: parseInt(q.get('trip') || '', 10) || 0 };
 if (q.get('embed') === '1') GipDriverReport.mount(app, Object.assign({ embed: true }, common));
 else GipDriverCabinet.mount(app, Object.assign({ screen: q.get('screen') || (common.vehicle ? 'form' : 'list'), report: q.get('report') || '' }, common));
 })();
